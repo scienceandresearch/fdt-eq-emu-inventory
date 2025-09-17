@@ -1,0 +1,15 @@
+Location	Name	ID	Count	Slots
+Primary	Staff of Elements	12350	1	0
+Secondary	Orb of Knowledge	12351	1	0
+Head	Crown of Intelligence	12352	1	0
+Chest	Robe of the Magi	12353	1	0
+Feet	Boots of Teleportation	12354	1	0
+General1	Akhevan Fragment of Truth (Enchanted)	20004	2	0
+General1	Fiery Fragment of Truth (Enchanted)	20005	4	0
+General2	Mana Potion	30003	8	0
+General3	Spell: Fireball	60001	1	0
+Bank1	Gelid Fragment of Truth (Legendary)	20006	1	0
+Bank2	Magical Fragment of Truth (Enchanted)	20007	3	0
+SharedBank1	Ancient Spellbook	60002	1	0
+SharedBank2	Wizard's Component Pouch	60003	1	0
+Empty	Empty	0	1	0

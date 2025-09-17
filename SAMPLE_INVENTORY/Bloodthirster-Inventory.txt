@@ -1,0 +1,15 @@
+Location	Name	ID	Count	Slots
+Primary	Legendary Sword of Power	12345	1	0
+Secondary	Shield of Protection	12346	1	0
+Head	Helm of Wisdom	12347	1	0
+Chest	Breastplate of Valor	12348	1	0
+Legs	Leggings of Agility	12349	1	0
+General1	Fragment of Truth (Enchanted)	20001	1	0
+General1	Prismatic Scale of Strength	20002	1	0
+General2	Healing Potion	30001	5	0
+General2	Food Ration	30002	10	0
+Bank1	Fragment of Truth (Legendary)	20003	1	0
+Bank1	Time Phased Quintessence	40001	1	0
+SharedBank1	Vortex of the Past	40002	1	0
+SharedBank2	Rare Gem	50001	3	0
+Empty	Empty	0	1	0
