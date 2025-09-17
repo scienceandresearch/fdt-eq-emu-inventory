@@ -3,7 +3,6 @@ import pandas as pd
 import os
 from datetime import datetime
 import re
-import hashlib
 
 # Page config
 st.set_page_config(
@@ -23,12 +22,6 @@ st.markdown("""
     color: white;
     border-radius: 10px;
     margin-bottom: 2rem;
-}
-.metric-card {
-    background: #f8fafc;
-    padding: 1rem;
-    border-radius: 8px;
-    border-left: 4px solid #3b82f6;
 }
 .stButton > button {
     width: 100%;
@@ -55,8 +48,23 @@ st.markdown("""
 # Initialize session state
 if 'items_df' not in st.session_state:
     st.session_state.items_df = pd.DataFrame()
-if 'last_search' not in st.session_state:
-    st.session_state.last_search = ""
+if 'search_term' not in st.session_state:
+    st.session_state.search_term = ""
+
+# Helper function
+def categorize_location(location):
+    """Categorize item location."""
+    location = str(location).lower()
+    if 'bank' in location:
+        return 'Bank'
+    elif 'bag' in location or 'slot' in location:
+        return 'Inventory'
+    elif location in ['charm', 'ear', 'head', 'face', 'neck', 'shoulders', 'arms', 'wrist', 
+                     'hands', 'finger', 'chest', 'legs', 'feet', 'waist', 'primary', 
+                     'secondary', 'range', 'ammo']:
+        return 'Equipped'
+    else:
+        return 'Other'
 
 # Sidebar for file upload and info
 with st.sidebar:
@@ -100,7 +108,6 @@ if uploaded_files:
     @st.cache_data
     def load_web_inventory_files(files):
         result_list = []
-        shared_bank_data = {}
         
         for file in files:
             try:
@@ -157,20 +164,6 @@ if uploaded_files:
             return final_df
         return pd.DataFrame()
     
-    def categorize_location(location):
-        """Categorize item location."""
-        location = str(location).lower()
-        if 'bank' in location:
-            return 'Bank'
-        elif 'bag' in location or 'slot' in location:
-            return 'Inventory'
-        elif location in ['charm', 'ear', 'head', 'face', 'neck', 'shoulders', 'arms', 'wrist', 
-                         'hands', 'finger', 'chest', 'legs', 'feet', 'waist', 'primary', 
-                         'secondary', 'range', 'ammo']:
-            return 'Equipped'
-        else:
-            return 'Other'
-    
     # Load data
     with st.spinner("🔄 Processing inventory files..."):
         items_df = load_web_inventory_files(uploaded_files)
@@ -215,7 +208,9 @@ if uploaded_files:
         # Search controls
         col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
         with col1:
-            search_term = st.text_input("🔎 Item Name", placeholder="Enter item name or pattern...")
+            search_term = st.text_input("🔎 Item Name", 
+                                      value=st.session_state.search_term,
+                                      placeholder="Enter item name or pattern...")
         with col2:
             character_options = ['All'] + sorted([c for c in items_df['Character'].unique() if c != 'SHARED-BANK'])
             character = st.selectbox("👤 Character", character_options)
@@ -233,9 +228,262 @@ if uploaded_files:
         # Equipment slots
         st.markdown("**⚔️ Equipment Slots:**")
         col1, col2, col3, col4, col5, col6 = st.columns(6)
-        equipment_searches = [
-            ("💍 Rings", "Ring"), ("👑 Head/Helm", "Helm|Head"), ("👕 Chest", "Chest|Breastplate|Robe|Tunic"),
-            ("👖 Legs", "Leg|Pant|Greave|Kilt"), ("👢 Feet", "Feet|Boot|Shoe|Sandal"), ("🤚 Hands", "Hand|Glove|Gauntlet")
-        ]
         
-        for i, (label, pattern) in enumerate(equipment_searches):\n            with [col1, col2, col3, col4, col5, col6][i]:\n                if st.button(label, key=f"equip_{i}"):\n                    search_term = pattern\n                    st.rerun()\n        \n        # Weapons\n        st.markdown("**🗡️ Weapons:**")\n        col1, col2, col3, col4 = st.columns(4)\n        weapon_searches = [\n            ("⚔️ Swords", "Sword"), ("🗡️ Daggers", "Dagger"), ("🪓 Axes", "Axe"), ("🔨 Maces", "Mace")\n        ]\n        \n        for i, (label, pattern) in enumerate(weapon_searches):\n            with [col1, col2, col3, col4][i]:\n                if st.button(label, key=f"weapon_{i}"):\n                    search_term = pattern\n                    st.rerun()\n        \n        # Special items\n        st.markdown("**✨ Special Items:**")\n        col1, col2, col3, col4 = st.columns(4)\n        special_searches = [\n            ("🔮 Truth Fragments", "Fragment of Truth"), ("⭐ Legendary", "Legendary"),\n            ("🌟 Enchanted", "Enchanted"), ("💎 Prismatic", "Prismatic")\n        ]\n        \n        for i, (label, pattern) in enumerate(special_searches):\n            with [col1, col2, col3, col4][i]:\n                if st.button(label, key=f"special_{i}"):\n                    search_term = pattern\n                    st.rerun()\n        \n        # Perform search\n        if search_term:\n            st.session_state.last_search = search_term\n            \n            # Apply search logic (reuse from desktop version)\n            df = items_df[items_df['IsEmpty'] == False].copy()\n            \n            if '|' in search_term:\n                df = df[df['Name'].str.contains(search_term, case=False, na=False, regex=True)]\n            elif exact_match:\n                df = df[df['Name'].str.lower() == search_term.lower()]\n            else:\n                df = df[df['Name'].str.contains(search_term, case=False, na=False)]\n            \n            if character != 'All':\n                df = df[df['Character'] == character]\n            \n            if item_type != 'All':\n                df = df[df['ItemType'] == item_type]\n            \n            # Display results\n            st.subheader(f"📄 Search Results ({len(df)} items found)")\n            \n            if not df.empty:\n                # Add action buttons\n                col1, col2, col3 = st.columns([2, 2, 1])\n                with col1:\n                    # Character summary for results\n                    char_counts = df['Character'].value_counts()\n                    if len(char_counts) > 1:\n                        st.info(f"📊 Found across {len(char_counts)} characters: " + \n                                ", ".join([f"{char} ({count})" for char, count in char_counts.head(5).items()]))\n                \n                with col2:\n                    # Export button\n                    csv = df[['Character', 'Name', 'Location', 'ItemType', 'Count']].to_csv(index=False)\n                    st.download_button(\n                        "💾 Download Results CSV",\n                        csv,\n                        f"search_results_{search_term.replace('|', '_')}.csv",\n                        "text/csv",\n                        key="download_results"\n                    )\n                \n                # Results table with better formatting\n                display_df = df[['Character', 'Name', 'Location', 'ItemType', 'Count']].copy()\n                \n                # Add some styling based on item type\n                def highlight_rows(row):\n                    if row['ItemType'] == 'Equipped':\n                        return ['background-color: #e6f3ff'] * len(row)\n                    elif row['ItemType'] == 'Bank':\n                        return ['background-color: #fff2e6'] * len(row)\n                    else:\n                        return [''] * len(row)\n                \n                st.dataframe(\n                    display_df.style.apply(highlight_rows, axis=1),\n                    use_container_width=True,\n                    hide_index=True\n                )\n                \n                # Quick actions on results\n                if len(df) > 1:\n                    with st.expander(f"🔄 Find Duplicates in Results"):\n                        duplicates = df.groupby(['Name', 'ID']).size().reset_index(name='Count')\n                        duplicates = duplicates[duplicates['Count'] > 1]\n                        \n                        if not duplicates.empty:\n                            st.dataframe(duplicates, hide_index=True)\n                        else:\n                            st.info("No duplicate items found in current results.")\n            \n            else:\n                st.info(f"🔍 No items found matching '{search_term}'. Try:\n\n" +\n                       "• Using partial names (e.g., 'sword' instead of 'Legendary Sword')\n\n" +\n                       "• Checking spelling\n\n" +\n                       "• Using broader search terms\n\n" +\n                       "• Trying the quick search buttons above")\n        \n        # Zeb Weapon Analysis\n        st.header("🗡️ Zeb Weapon Component Analysis")\n        \n        col1, col2 = st.columns([3, 1])\n        with col1:\n            st.info("🎯 **Zeb Weapon Requirements:** 12 different Fragment of Truth types (Legendary) + Time Phased Quintessence + Vortex of the Past")\n        with col2:\n            if st.button("🔍 Analyze Components", type="primary"):\n                with st.spinner("🔄 Analyzing Zeb weapon components..."):\n                    # Zeb weapon analysis (simplified for web)\n                    required_fragments = [\n                        "Akhevan Fragment of Truth", "Fiery Fragment of Truth", "Gelid Fragment of Truth",\n                        "Hastened Fragment of Truth", "Healing Fragment of Truth", "Icy Fragment of Truth",\n                        "Lethal Fragment of Truth", "Magical Fragment of Truth", "Replenishing Fragment of Truth",\n                        "Runic Fragment of Truth", "Ssraeshzian Fragment of Truth", "Yttrium Fragment of Truth"\n                    ]\n                    \n                    other_components = ["Time Phased Quintessence", "Vortex of the Past"]\n                    \n                    fragment_status = []\n                    for fragment in required_fragments:\n                        legendary_count = len(items_df[\n                            items_df['Name'].str.contains(f"{fragment} (Legendary)", case=False, na=False, regex=False)\n                        ])\n                        enchanted_count = len(items_df[\n                            items_df['Name'].str.contains(f"{fragment} (Enchanted)", case=False, na=False, regex=False)\n                        ])\n                        \n                        ready = legendary_count > 0 or enchanted_count >= 4\n                        status = "✅ Ready" if ready else ("🔄 Can Make" if enchanted_count > 0 else "❌ Missing")\n                        \n                        fragment_status.append({\n                            "Fragment": fragment.replace(" Fragment of Truth", ""),\n                            "Status": status,\n                            "Legendary": legendary_count,\n                            "Enchanted": enchanted_count,\n                            "Notes": f"Can make from {enchanted_count}/4 Enchanted" if enchanted_count > 0 and legendary_count == 0 else "Ready!" if ready else "Need more"\n                        })\n                    \n                    # Other components\n                    other_status = []\n                    for component in other_components:\n                        count = len(items_df[\n                            items_df['Name'].str.contains(component, case=False, na=False, regex=False)\n                        ])\n                        other_status.append({\n                            "Component": component,\n                            "Status": "✅ Ready" if count > 0 else "❌ Missing",\n                            "Count": count\n                        })\n                    \n                    # Display results\n                    ready_fragments = len([f for f in fragment_status if f['Status'] == '✅ Ready'])\n                    can_make_fragments = len([f for f in fragment_status if f['Status'] == '🔄 Can Make'])\n                    ready_others = len([c for c in other_status if c['Status'] == '✅ Ready'])\n                    \n                    total_ready = ready_fragments + can_make_fragments\n                    \n                    # Summary metrics\n                    col1, col2, col3 = st.columns(3)\n                    with col1:\n                        st.metric("Fragments Ready", f"{total_ready}/12", f"{total_ready - 12}" if total_ready < 12 else "Complete!")\n                    with col2:\n                        st.metric("Other Components", f"{ready_others}/2", f"{ready_others - 2}" if ready_others < 2 else "Complete!")\n                    with col3:\n                        can_craft = total_ready == 12 and ready_others == 2\n                        st.metric("Can Craft Zeb Weapon", "YES! 🎉" if can_craft else "Not Yet")\n                    \n                    if can_craft:\n                        st.success("🎉 **Congratulations!** You have all components needed to craft a Zeb Weapon!")\n                        st.balloons()\n                    else:\n                        missing = 12 - total_ready + (2 - ready_others)\n                        st.warning(f"⚠️ Missing {missing} components total. Keep collecting!")\n                    \n                    # Detailed breakdown\n                    with st.expander("📋 Detailed Component Breakdown", expanded=can_craft):\n                        st.subheader("Fragment Status")\n                        status_df = pd.DataFrame(fragment_status)\n                        st.dataframe(status_df, hide_index=True, use_container_width=True)\n                        \n                        st.subheader("Other Components")\n                        other_df = pd.DataFrame(other_status)\n                        st.dataframe(other_df, hide_index=True, use_container_width=True)\n                        \n                        if not can_craft:\n                            st.info("💡 **Tip:** You can combine 4 Enchanted fragments to make 1 Legendary fragment!")\n\nelse:\n    # Welcome screen\n    col1, col2, col3 = st.columns([1, 2, 1])\n    \n    with col2:\n        st.markdown(\"\"\"  \n        ### 🚀 Welcome to THJ Inventory Manager!\n        \n        This web application helps you manage and search your **The Heroes Journey** EverQuest character inventories.\n        \n        **🎯 Key Features:**\n        - **Advanced Search** - Find items across all characters\n        - **Zeb Weapon Analyzer** - Check crafting components  \n        - **Export Results** - Download search results as CSV\n        - **Real-time Analysis** - Instant feedback and statistics\n        \n        **📁 To Get Started:**\n        1. Use the sidebar to upload your `*-Inventory.txt` files\n        2. Files should be in tab-separated format from THJ\n        3. Upload multiple character files at once\n        \n        **💡 This is the web version** - no installation required!\n        \n        For the full desktop application with additional features, \n        visit our [GitHub repository](https://github.com/scienceandresearch/thj-inventory-manager).\n        \"\"\")\n        \n        # Sample file format\n        with st.expander("📖 Expected File Format"):\n            st.code(\"\"\"\nLocation\\tName\\tID\\tCount\\tSlots\nPrimary\\tLegendary Sword\\t12345\\t1\\t0\nGeneral1\\tFragment of Truth (Enchanted)\\t67890\\t1\\t0\nBank1\\tTime Phased Quintessence\\t11111\\t1\\t0\n\"\"\", language=\"tsv\")\n    \n# Footer\nst.markdown(\"---\")\ncol1, col2, col3 = st.columns(3)\nwith col1:\n    st.markdown(\"**🎮 THJ Inventory Manager**\")\nwith col2:\n    st.markdown(\"[📥 Desktop Version](https://github.com/scienceandresearch/thj-inventory-manager)\")\nwith col3:\n    st.markdown(\"[🐛 Report Issues](https://github.com/scienceandresearch/thj-inventory-manager/issues)\")\n
+        if col1.button("💍 Rings", key="ring_btn"):
+            st.session_state.search_term = "Ring"
+            st.rerun()
+        if col2.button("👑 Head/Helm", key="head_btn"):
+            st.session_state.search_term = "Helm|Head"
+            st.rerun()
+        if col3.button("👕 Chest", key="chest_btn"):
+            st.session_state.search_term = "Chest|Breastplate|Robe|Tunic"
+            st.rerun()
+        if col4.button("👖 Legs", key="legs_btn"):
+            st.session_state.search_term = "Leg|Pant|Greave|Kilt"
+            st.rerun()
+        if col5.button("👢 Feet", key="feet_btn"):
+            st.session_state.search_term = "Feet|Boot|Shoe|Sandal"
+            st.rerun()
+        if col6.button("🤚 Hands", key="hands_btn"):
+            st.session_state.search_term = "Hand|Glove|Gauntlet"
+            st.rerun()
+        
+        # Weapons
+        st.markdown("**🗡️ Weapons:**")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        if col1.button("⚔️ Swords", key="sword_btn"):
+            st.session_state.search_term = "Sword"
+            st.rerun()
+        if col2.button("🗡️ Daggers", key="dagger_btn"):
+            st.session_state.search_term = "Dagger"
+            st.rerun()
+        if col3.button("🪓 Axes", key="axe_btn"):
+            st.session_state.search_term = "Axe"
+            st.rerun()
+        if col4.button("🔨 Maces", key="mace_btn"):
+            st.session_state.search_term = "Mace"
+            st.rerun()
+        
+        # Special items
+        st.markdown("**✨ Special Items:**")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        if col1.button("🔮 Truth Fragments", key="truth_btn"):
+            st.session_state.search_term = "Fragment of Truth"
+            st.rerun()
+        if col2.button("⭐ Legendary", key="legendary_btn"):
+            st.session_state.search_term = "Legendary"
+            st.rerun()
+        if col3.button("🌟 Enchanted", key="enchanted_btn"):
+            st.session_state.search_term = "Enchanted"
+            st.rerun()
+        if col4.button("💎 Prismatic", key="prismatic_btn"):
+            st.session_state.search_term = "Prismatic"
+            st.rerun()
+        
+        # Use search term from session state if set by button
+        if st.session_state.search_term and not search_term:
+            search_term = st.session_state.search_term
+        
+        # Perform search
+        if search_term:
+            # Apply search logic (reuse from desktop version)
+            df = items_df[items_df['IsEmpty'] == False].copy()
+            
+            if '|' in search_term:
+                df = df[df['Name'].str.contains(search_term, case=False, na=False, regex=True)]
+            elif exact_match:
+                df = df[df['Name'].str.lower() == search_term.lower()]
+            else:
+                df = df[df['Name'].str.contains(search_term, case=False, na=False)]
+            
+            if character != 'All':
+                df = df[df['Character'] == character]
+            
+            if item_type != 'All':
+                df = df[df['ItemType'] == item_type]
+            
+            # Display results
+            st.subheader(f"📄 Search Results ({len(df)} items found)")
+            
+            if not df.empty:
+                # Add action buttons
+                col1, col2, col3 = st.columns([2, 2, 1])
+                with col1:
+                    # Character summary for results
+                    char_counts = df['Character'].value_counts()
+                    if len(char_counts) > 1:
+                        st.info(f"📊 Found across {len(char_counts)} characters: " + 
+                                ", ".join([f"{char} ({count})" for char, count in char_counts.head(5).items()]))
+                
+                with col2:
+                    # Export button
+                    csv = df[['Character', 'Name', 'Location', 'ItemType', 'Count']].to_csv(index=False)
+                    st.download_button(
+                        "💾 Download Results CSV",
+                        csv,
+                        f"search_results_{search_term.replace('|', '_')}.csv",
+                        "text/csv",
+                        key="download_results"
+                    )
+                
+                # Results table
+                display_df = df[['Character', 'Name', 'Location', 'ItemType', 'Count']].copy()
+                st.dataframe(
+                    display_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Find duplicates in results
+                if len(df) > 1:
+                    with st.expander(f"🔄 Find Duplicates in Results"):
+                        duplicates = df.groupby(['Name', 'ID']).size().reset_index(name='Count')
+                        duplicates = duplicates[duplicates['Count'] > 1]
+                        
+                        if not duplicates.empty:
+                            st.dataframe(duplicates, hide_index=True)
+                        else:
+                            st.info("No duplicate items found in current results.")
+            
+            else:
+                st.info(f"🔍 No items found matching '{search_term}'. Try:\n\n" +
+                       "• Using partial names (e.g., 'sword' instead of 'Legendary Sword')\n\n" +
+                       "• Checking spelling\n\n" +
+                       "• Using broader search terms\n\n" +
+                       "• Trying the quick search buttons above")
+        
+        # Zeb Weapon Analysis
+        st.header("🗡️ Zeb Weapon Component Analysis")
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.info("🎯 **Zeb Weapon Requirements:** 12 different Fragment of Truth types (Legendary) + Time Phased Quintessence + Vortex of the Past")
+        with col2:
+            if st.button("🔍 Analyze Components", type="primary"):
+                with st.spinner("🔄 Analyzing Zeb weapon components..."):
+                    # Zeb weapon analysis
+                    required_fragments = [
+                        "Akhevan Fragment of Truth", "Fiery Fragment of Truth", "Gelid Fragment of Truth",
+                        "Hastened Fragment of Truth", "Healing Fragment of Truth", "Icy Fragment of Truth",
+                        "Lethal Fragment of Truth", "Magical Fragment of Truth", "Replenishing Fragment of Truth",
+                        "Runic Fragment of Truth", "Ssraeshzian Fragment of Truth", "Yttrium Fragment of Truth"
+                    ]
+                    
+                    other_components = ["Time Phased Quintessence", "Vortex of the Past"]
+                    
+                    fragment_status = []
+                    for fragment in required_fragments:
+                        legendary_count = len(items_df[
+                            items_df['Name'].str.contains(f"{fragment} (Legendary)", case=False, na=False, regex=False)
+                        ])
+                        enchanted_count = len(items_df[
+                            items_df['Name'].str.contains(f"{fragment} (Enchanted)", case=False, na=False, regex=False)
+                        ])
+                        
+                        ready = legendary_count > 0 or enchanted_count >= 4
+                        status = "✅ Ready" if ready else ("🔄 Can Make" if enchanted_count > 0 else "❌ Missing")
+                        
+                        fragment_status.append({
+                            "Fragment": fragment.replace(" Fragment of Truth", ""),
+                            "Status": status,
+                            "Legendary": legendary_count,
+                            "Enchanted": enchanted_count,
+                            "Notes": f"Can make from {enchanted_count}/4 Enchanted" if enchanted_count > 0 and legendary_count == 0 else "Ready!" if ready else "Need more"
+                        })
+                    
+                    # Other components
+                    other_status = []
+                    for component in other_components:
+                        count = len(items_df[
+                            items_df['Name'].str.contains(component, case=False, na=False, regex=False)
+                        ])
+                        other_status.append({
+                            "Component": component,
+                            "Status": "✅ Ready" if count > 0 else "❌ Missing",
+                            "Count": count
+                        })
+                    
+                    # Display results
+                    ready_fragments = len([f for f in fragment_status if f['Status'] == '✅ Ready'])
+                    can_make_fragments = len([f for f in fragment_status if f['Status'] == '🔄 Can Make'])
+                    ready_others = len([c for c in other_status if c['Status'] == '✅ Ready'])
+                    
+                    total_ready = ready_fragments + can_make_fragments
+                    
+                    # Summary metrics
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Fragments Ready", f"{total_ready}/12", f"{total_ready - 12}" if total_ready < 12 else "Complete!")
+                    with col2:
+                        st.metric("Other Components", f"{ready_others}/2", f"{ready_others - 2}" if ready_others < 2 else "Complete!")
+                    with col3:
+                        can_craft = total_ready == 12 and ready_others == 2
+                        st.metric("Can Craft Zeb Weapon", "YES! 🎉" if can_craft else "Not Yet")
+                    
+                    if can_craft:
+                        st.success("🎉 **Congratulations!** You have all components needed to craft a Zeb Weapon!")
+                        st.balloons()
+                    else:
+                        missing = 12 - total_ready + (2 - ready_others)
+                        st.warning(f"⚠️ Missing {missing} components total. Keep collecting!")
+                    
+                    # Detailed breakdown
+                    with st.expander("📋 Detailed Component Breakdown", expanded=can_craft):
+                        st.subheader("Fragment Status")
+                        status_df = pd.DataFrame(fragment_status)
+                        st.dataframe(status_df, hide_index=True, use_container_width=True)
+                        
+                        st.subheader("Other Components")
+                        other_df = pd.DataFrame(other_status)
+                        st.dataframe(other_df, hide_index=True, use_container_width=True)
+                        
+                        if not can_craft:
+                            st.info("💡 **Tip:** You can combine 4 Enchanted fragments to make 1 Legendary fragment!")
+
+else:
+    # Welcome screen
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown("""  
+        ### 🚀 Welcome to THJ Inventory Manager!
+        
+        This web application helps you manage and search your **The Heroes Journey** EverQuest character inventories.
+        
+        **🎯 Key Features:**
+        - **Advanced Search** - Find items across all characters
+        - **Zeb Weapon Analyzer** - Check crafting components  
+        - **Export Results** - Download search results as CSV
+        - **Real-time Analysis** - Instant feedback and statistics
+        
+        **📁 To Get Started:**
+        1. Use the sidebar to upload your `*-Inventory.txt` files
+        2. Files should be in tab-separated format from THJ
+        3. Upload multiple character files at once
+        
+        **💡 This is the web version** - no installation required!
+        
+        For the full desktop application with additional features, 
+        visit our [GitHub repository](https://github.com/scienceandresearch/thj-inventory-manager).
+        """)
+        
+        # Sample file format
+        with st.expander("📖 Expected File Format"):
+            st.code("""
+Location\tName\tID\tCount\tSlots
+Primary\tLegendary Sword\t12345\t1\t0
+General1\tFragment of Truth (Enchanted)\t67890\t1\t0
+Bank1\tTime Phased Quintessence\t11111\t1\t0
+""", language="tsv")
+    
+# Footer
+st.markdown("---")
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown("**🎮 THJ Inventory Manager**")
+with col2:
+    st.markdown("[📥 Desktop Version](https://github.com/scienceandresearch/thj-inventory-manager)")
+with col3:
+    st.markdown("[🐛 Report Issues](https://github.com/scienceandresearch/thj-inventory-manager/issues)")
