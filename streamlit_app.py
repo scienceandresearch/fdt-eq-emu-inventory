@@ -27,12 +27,6 @@ st.markdown("""
     width: 100%;
     margin: 2px 0;
 }
-.search-section {
-    background: #f1f5f9;
-    padding: 1rem;
-    border-radius: 8px;
-    margin: 1rem 0;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -50,6 +44,8 @@ if 'items_df' not in st.session_state:
     st.session_state.items_df = pd.DataFrame()
 if 'search_term' not in st.session_state:
     st.session_state.search_term = ""
+if 'zeb_results' not in st.session_state:
+    st.session_state.zeb_results = None
 
 # Helper function
 def categorize_location(location):
@@ -84,17 +80,18 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("📖 Quick Guide")
     st.markdown("""
-    **File Format:**
-    - `CharacterName-Inventory.txt`
-    - Tab-separated columns
-    - Location, Name, ID, Count, Slots
+    **Getting Your Files:**
+    - Login to your character in EverQuest
+    - Run `/outputfile inventory` in-game
+    - If in the Bazaar, it captures bank slots too!
+    - Find `CharacterName-Inventory.txt` in your EQ folder
     
-    **Features:**
-    - 🔍 Advanced search with filters
-    - ⚡ Quick search buttons
-    - 🗡️ Zeb weapon analyzer
-    - 💾 Export results to CSV
-    - 🔄 Find duplicate items
+    **Using the Tool:**
+    - 📤 Upload one or more inventory files above
+    - 🔍 Use search to find your Tulwar (or any item!)
+    - ⚡ Try quick search buttons for common items
+    - 🗡️ Check Zeb weapon components
+    - 💾 Export results to CSV files
     """)
     
     st.markdown("---")
@@ -197,12 +194,11 @@ if uploaded_files:
             
             st.dataframe(
                 char_summary,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
         
         # Search Section
-        st.markdown('<div class="search-section">', unsafe_allow_html=True)
         st.subheader("🔍 Search Inventory")
         
         # Search controls
@@ -220,67 +216,59 @@ if uploaded_files:
             st.write("") # Spacer
             exact_match = st.checkbox("Exact Match")
         
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Quick search buttons
-        st.subheader("⚡ Quick Searches")
-        
-        # Equipment slots
-        st.markdown("**⚔️ Equipment Slots:**")
-        col1, col2, col3, col4, col5, col6 = st.columns(6)
-        
-        if col1.button("💍 Rings", key="ring_btn"):
-            st.session_state.search_term = "Ring"
-            st.rerun()
-        if col2.button("👑 Head/Helm", key="head_btn"):
-            st.session_state.search_term = "Helm|Head"
-            st.rerun()
-        if col3.button("👕 Chest", key="chest_btn"):
-            st.session_state.search_term = "Chest|Breastplate|Robe|Tunic"
-            st.rerun()
-        if col4.button("👖 Legs", key="legs_btn"):
-            st.session_state.search_term = "Leg|Pant|Greave|Kilt"
-            st.rerun()
-        if col5.button("👢 Feet", key="feet_btn"):
-            st.session_state.search_term = "Feet|Boot|Shoe|Sandal"
-            st.rerun()
-        if col6.button("🤚 Hands", key="hands_btn"):
-            st.session_state.search_term = "Hand|Glove|Gauntlet"
-            st.rerun()
-        
-        # Weapons
-        st.markdown("**🗡️ Weapons:**")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        if col1.button("⚔️ Swords", key="sword_btn"):
-            st.session_state.search_term = "Sword"
-            st.rerun()
-        if col2.button("🗡️ Daggers", key="dagger_btn"):
-            st.session_state.search_term = "Dagger"
-            st.rerun()
-        if col3.button("🪓 Axes", key="axe_btn"):
-            st.session_state.search_term = "Axe"
-            st.rerun()
-        if col4.button("🔨 Maces", key="mace_btn"):
-            st.session_state.search_term = "Mace"
-            st.rerun()
-        
-        # Special items
-        st.markdown("**✨ Special Items:**")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        if col1.button("🔮 Truth Fragments", key="truth_btn"):
-            st.session_state.search_term = "Fragment of Truth"
-            st.rerun()
-        if col2.button("⭐ Legendary", key="legendary_btn"):
-            st.session_state.search_term = "Legendary"
-            st.rerun()
-        if col3.button("🌟 Enchanted", key="enchanted_btn"):
-            st.session_state.search_term = "Enchanted"
-            st.rerun()
-        if col4.button("💎 Prismatic", key="prismatic_btn"):
-            st.session_state.search_term = "Prismatic"
-            st.rerun()
+        # Condensed quick search buttons
+        with st.expander("⚡ Quick Searches", expanded=False):
+            # Equipment slots in 2 rows
+            st.markdown("**⚔️ Equipment:**")
+            eq_col1, eq_col2, eq_col3, eq_col4, eq_col5, eq_col6 = st.columns(6)
+            
+            if eq_col1.button("💍 Rings", key="ring_btn"):
+                st.session_state.search_term = "Ring"
+                st.rerun()
+            if eq_col2.button("👑 Head", key="head_btn"):
+                st.session_state.search_term = "Helm|Head"
+                st.rerun()
+            if eq_col3.button("👕 Chest", key="chest_btn"):
+                st.session_state.search_term = "Chest|Breastplate|Robe|Tunic"
+                st.rerun()
+            if eq_col4.button("👖 Legs", key="legs_btn"):
+                st.session_state.search_term = "Leg|Pant|Greave|Kilt"
+                st.rerun()
+            if eq_col5.button("👢 Feet", key="feet_btn"):
+                st.session_state.search_term = "Feet|Boot|Shoe|Sandal"
+                st.rerun()
+            if eq_col6.button("🤚 Hands", key="hands_btn"):
+                st.session_state.search_term = "Hand|Glove|Gauntlet"
+                st.rerun()
+            
+            # Weapons and special items in one row
+            st.markdown("**🗡️ Weapons & Special:**")
+            quick_col1, quick_col2, quick_col3, quick_col4, quick_col5, quick_col6, quick_col7, quick_col8 = st.columns(8)
+            
+            if quick_col1.button("⚔️ Swords", key="sword_btn"):
+                st.session_state.search_term = "Sword"
+                st.rerun()
+            if quick_col2.button("🗡️ Daggers", key="dagger_btn"):
+                st.session_state.search_term = "Dagger"
+                st.rerun()
+            if quick_col3.button("🪓 Axes", key="axe_btn"):
+                st.session_state.search_term = "Axe"
+                st.rerun()
+            if quick_col4.button("🔨 Maces", key="mace_btn"):
+                st.session_state.search_term = "Mace"
+                st.rerun()
+            if quick_col5.button("🔮 Truth Fragments", key="truth_btn"):
+                st.session_state.search_term = "Fragment of Truth"
+                st.rerun()
+            if quick_col6.button("⭐ Legendary", key="legendary_btn"):
+                st.session_state.search_term = "Legendary"
+                st.rerun()
+            if quick_col7.button("🌟 Enchanted", key="enchanted_btn"):
+                st.session_state.search_term = "Enchanted"
+                st.rerun()
+            if quick_col8.button("💎 Prismatic", key="prismatic_btn"):
+                st.session_state.search_term = "Prismatic"
+                st.rerun()
         
         # Use search term from session state if set by button
         if st.session_state.search_term and not search_term:
@@ -304,8 +292,9 @@ if uploaded_files:
             if item_type != 'All':
                 df = df[df['ItemType'] == item_type]
             
-            # Display results
-            st.subheader(f"📄 Search Results ({len(df)} items found)")
+            # Display results with enhanced highlighting
+            st.markdown("---")
+            st.success(f"📄 **Search Results:** '{search_term}' ({len(df)} items found)")
             
             if not df.empty:
                 # Add action buttons
@@ -332,7 +321,7 @@ if uploaded_files:
                 display_df = df[['Character', 'Name', 'Location', 'ItemType', 'Count']].copy()
                 st.dataframe(
                     display_df,
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
                 
@@ -348,21 +337,178 @@ if uploaded_files:
                             st.info("No duplicate items found in current results.")
             
             else:
-                st.info(f"🔍 No items found matching '{search_term}'. Try:\n\n" +
-                       "• Using partial names (e.g., 'sword' instead of 'Legendary Sword')\n\n" +
-                       "• Checking spelling\n\n" +
-                       "• Using broader search terms\n\n" +
-                       "• Trying the quick search buttons above")
+                # Enhanced no results message
+                st.markdown("---")
+                st.warning(f"🔍 **No items found matching '{search_term}'**")
+                st.info("""
+                **💡 Search Tips:**
+                - Try partial names (e.g., 'sword' instead of 'Legendary Sword')
+                - Check spelling
+                - Use broader search terms  
+                - Try the Quick Search buttons above
+                - Use regex patterns like `Sword|Axe|Mace` for multiple types
+                """)
         
-        # Zeb Weapon Analysis
+        # Move Zeb Weapon Analysis to center area
+        st.markdown("---")
         st.header("🗡️ Zeb Weapon Component Analysis")
+        st.markdown("*Check your progress toward crafting the legendary Zeb Weapon*")
         
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.info("🎯 **Zeb Weapon Requirements:** 12 different Fragment of Truth types (Legendary) + Time Phased Quintessence + Vortex of the Past")
-        with col2:
-            if st.button("🔍 Analyze Components", type="primary"):
-                with st.spinner("🔄 Analyzing Zeb weapon components..."):
+        # Show persistent results if available (like desktop version)
+        if st.session_state.zeb_results:
+            results = st.session_state.zeb_results
+            
+            # Summary metrics in prominent display
+            metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+            with metric_col1:
+                st.metric("Fragments Ready", f"{results['ready']}/12")
+            with metric_col2:
+                st.metric("Other Components", f"{results['other_ready']}/2")
+            with metric_col3:
+                craft_status = "YES! 🎉" if results['can_craft'] else "Not Yet"
+                st.metric("Can Craft Zeb Weapon", craft_status)
+            with metric_col4:
+                # Add debug location button here - make it more prominent
+                st.markdown("**🔍 Locations:**")
+                if st.button("📍 Show Fragment Locations", help="Show detailed component locations", type="secondary", width='stretch'):
+                    st.session_state.show_zeb_debug = True
+            
+            if results['can_craft']:
+                st.success("🎉 **Zeb Weapon Ready!** All components available!")
+                st.balloons()
+            else:
+                missing = results.get('missing_count', 0)
+                st.warning(f"⚠️ Missing {missing} components. Keep collecting!")
+            
+            # Show detailed breakdown in center space
+            breakdown_col1, breakdown_col2 = st.columns([3, 2])
+            
+            with breakdown_col1:
+                st.subheader("🧩 Fragment Status")
+                # Create enhanced fragment display
+                fragment_data = []
+                for frag in results.get('fragments', []):
+                    fragment_data.append({
+                        'Fragment': frag['Fragment'],
+                        'Status': frag['Status'], 
+                        'Legendary': frag['Legendary'],
+                        'Enchanted': frag['Enchanted'],
+                        'Notes': frag['Notes']
+                    })
+                
+                if fragment_data:
+                    st.dataframe(
+                        pd.DataFrame(fragment_data),
+                        width='stretch',
+                        hide_index=True,
+                        column_config={
+                            "Fragment": st.column_config.TextColumn("🧩 Fragment", width="medium"),
+                            "Status": st.column_config.TextColumn("📊 Status", width="small"),
+                            "Legendary": st.column_config.NumberColumn("🏆 Legendary", width="small"),
+                            "Enchanted": st.column_config.NumberColumn("⭐ Enchanted", width="small"),
+                            "Notes": st.column_config.TextColumn("📝 Notes", width="large")
+                        }
+                    )
+            
+            with breakdown_col2:
+                st.subheader("🔧 Other Components")
+                other_data = []
+                for comp in results.get('other_components', []):
+                    other_data.append({
+                        'Component': comp['Component'],
+                        'Status': comp['Status'],
+                        'Count': comp['Count']
+                    })
+                
+                if other_data:
+                    st.dataframe(
+                        pd.DataFrame(other_data),
+                        width='stretch',
+                        hide_index=True
+                    )
+                
+                st.markdown("**💡 Tips:**")
+                st.info("""
+                • Combine 4 Enchanted → 1 Legendary
+                • Time Phased Quintessence & Vortex of the Past are rare drops
+                • Use Show Fragment Locations to see exactly where your components are
+                """)
+            
+            # Fragment location display
+            if st.session_state.get('show_zeb_debug', False):
+                st.markdown("---")
+                st.subheader("📍 Fragment Location Details")
+                st.markdown("*Detailed breakdown of where each component is located*")
+                
+                # Show locations for each component
+                debug_items_df = st.session_state.items_df
+                
+                debug_col1, debug_col2 = st.columns(2)
+                
+                with debug_col1:
+                    st.markdown("**🧩 Fragment Locations:**")
+                    
+                    required_fragments = [
+                        "Akhevan Fragment of Truth", "Fiery Fragment of Truth", "Gelid Fragment of Truth",
+                        "Hastened Fragment of Truth", "Healing Fragment of Truth", "Icy Fragment of Truth",
+                        "Lethal Fragment of Truth", "Magical Fragment of Truth", "Replenishing Fragment of Truth",
+                        "Runic Fragment of Truth", "Ssraeshzian Fragment of Truth", "Yttrium Fragment of Truth"
+                    ]
+                    
+                    for fragment in required_fragments:
+                        fragment_short = fragment.replace(" Fragment of Truth", "")
+                        
+                        # Find all instances of this fragment
+                        legendary_items = debug_items_df[
+                            debug_items_df['Name'].str.contains(f"{fragment} (Legendary)", case=False, na=False, regex=False)
+                        ]
+                        enchanted_items = debug_items_df[
+                            debug_items_df['Name'].str.contains(f"{fragment} (Enchanted)", case=False, na=False, regex=False)
+                        ]
+                        
+                        if not legendary_items.empty or not enchanted_items.empty:
+                            with st.expander(f"🧩 {fragment_short} ({len(legendary_items) + len(enchanted_items)} found)"):
+                                if not legendary_items.empty:
+                                    st.write("**🏆 Legendary:**")
+                                    for _, item in legendary_items.iterrows():
+                                        st.write(f"• {item['Character']} - {item['Location']}")
+                                
+                                if not enchanted_items.empty:
+                                    st.write("**⭐ Enchanted:**")
+                                    for _, item in enchanted_items.iterrows():
+                                        st.write(f"• {item['Character']} - {item['Location']}")
+                
+                with debug_col2:
+                    st.markdown("**🔧 Other Component Locations:**")
+                    
+                    other_components = ["Time Phased Quintessence", "Vortex of the Past"]
+                    
+                    for component in other_components:
+                        component_items = debug_items_df[
+                            debug_items_df['Name'].str.contains(component, case=False, na=False, regex=False)
+                        ]
+                        
+                        if not component_items.empty:
+                            with st.expander(f"🔧 {component} ({len(component_items)} found)"):
+                                for _, item in component_items.iterrows():
+                                    st.write(f"• {item['Character']} - {item['Location']}")
+                        else:
+                            st.error(f"❌ {component} - Not found")
+                
+                # Add close debug button
+                if st.button("❌ Close Fragment Locations"):
+                    st.session_state.show_zeb_debug = False
+                    st.rerun()
+        
+        # Analysis controls
+        control_col1, control_col2, control_col3 = st.columns([2, 1, 1])
+        
+        with control_col1:
+            st.info("🎯 **Requirements:** 12 different Fragment of Truth types (Legendary) + Time Phased Quintessence + Vortex of the Past")
+        
+        with control_col2:
+            if st.button("🔍 Analyze My Components", type="primary"):
+                with st.spinner("🔄 Analyzing components..."):
                     # Zeb weapon analysis
                     required_fragments = [
                         "Akhevan Fragment of Truth", "Fiery Fragment of Truth", "Gelid Fragment of Truth",
@@ -405,42 +551,26 @@ if uploaded_files:
                             "Count": count
                         })
                     
-                    # Display results
+                    # Calculate totals
                     ready_fragments = len([f for f in fragment_status if f['Status'] == '✅ Ready'])
                     can_make_fragments = len([f for f in fragment_status if f['Status'] == '🔄 Can Make'])
                     ready_others = len([c for c in other_status if c['Status'] == '✅ Ready'])
                     
                     total_ready = ready_fragments + can_make_fragments
+                    can_craft = total_ready == 12 and ready_others == 2
+                    missing_count = (12 - total_ready) + (2 - ready_others)
                     
-                    # Summary metrics
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Fragments Ready", f"{total_ready}/12", f"{total_ready - 12}" if total_ready < 12 else "Complete!")
-                    with col2:
-                        st.metric("Other Components", f"{ready_others}/2", f"{ready_others - 2}" if ready_others < 2 else "Complete!")
-                    with col3:
-                        can_craft = total_ready == 12 and ready_others == 2
-                        st.metric("Can Craft Zeb Weapon", "YES! 🎉" if can_craft else "Not Yet")
+                    # Store results in session state
+                    st.session_state.zeb_results = {
+                        'ready': total_ready,
+                        'other_ready': ready_others,
+                        'can_craft': can_craft,
+                        'missing_count': missing_count,
+                        'fragments': fragment_status,
+                        'other_components': other_status
+                    }
                     
-                    if can_craft:
-                        st.success("🎉 **Congratulations!** You have all components needed to craft a Zeb Weapon!")
-                        st.balloons()
-                    else:
-                        missing = 12 - total_ready + (2 - ready_others)
-                        st.warning(f"⚠️ Missing {missing} components total. Keep collecting!")
-                    
-                    # Detailed breakdown
-                    with st.expander("📋 Detailed Component Breakdown", expanded=can_craft):
-                        st.subheader("Fragment Status")
-                        status_df = pd.DataFrame(fragment_status)
-                        st.dataframe(status_df, hide_index=True, use_container_width=True)
-                        
-                        st.subheader("Other Components")
-                        other_df = pd.DataFrame(other_status)
-                        st.dataframe(other_df, hide_index=True, use_container_width=True)
-                        
-                        if not can_craft:
-                            st.info("💡 **Tip:** You can combine 4 Enchanted fragments to make 1 Legendary fragment!")
+                    st.rerun()  # Refresh to show results
 
 else:
     # Welcome screen
@@ -458,10 +588,13 @@ else:
         - **Export Results** - Download search results as CSV
         - **Real-time Analysis** - Instant feedback and statistics
         
-        **📁 To Get Started:**
-        1. Use the sidebar to upload your `*-Inventory.txt` files
-        2. Files should be in tab-separated format from EQ Emu
-        3. Upload multiple character files at once
+        **📁 Getting Started:**
+        1. **In EverQuest**: Login to your character
+        2. **Run Command**: Type `/outputfile inventory` in-game  
+        3. **Pro Tip**: Do this in the Bazaar to include bank slots!
+        4. **Find Files**: Look for `CharacterName-Inventory.txt` in your EQ folder
+        5. **Upload Here**: Use the sidebar to upload your files
+        6. **Search Away**: Find your Tulwar or any other item!
         
         **💡 This is the web version** - no installation required!
         
