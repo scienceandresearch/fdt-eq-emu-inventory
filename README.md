@@ -56,10 +56,21 @@
 
 ## 📁 Setting Up Your Inventory Files
 
-1. **Copy your inventory files** (format: `CharacterName-Inventory.txt`) to a folder
-2. **Launch the application**
-3. **Browse** to select your inventory files folder
-4. **Click "Load Inventory"**
+### Step 1: Generate Inventory Files In-Game
+1. **Login** to your character in EverQuest
+2. **Run the command**: `/outputfile inventory`
+3. **Pro Tip**: If you're in the Bazaar, this will also capture your bank slots!
+4. **Repeat** for each character you want to analyze
+
+### Step 2: Locate Your Files  
+1. **Find the files** in your EverQuest folder (usually named `CharacterName-Inventory.txt`)
+2. **Copy them** to a dedicated folder for easy access
+
+### Step 3: Load Into FDT Parser
+1. **Launch the application**
+2. **Browse** to select your inventory files folder
+3. **Click "Load Inventory"**
+4. **Start searching** for your Tulwar (or any item!)
 
 ### Supported File Format
 - Files must be named: `CharacterName-Inventory.txt`
@@ -89,12 +100,14 @@
 
 ## 🔍 Search Examples
 
+- `Tulwar` - Find DnK's Tulwar (or any Tulwar!)
 - `Fragment of Truth` - Find all truth fragments
 - `Legendary` - Find all legendary items  
 - `Prismatic Scale` - Find prismatic scales
 - `Sword` - Find all swords
 - `Ring` - Find all rings
 - Use **Quick Search Buttons** for common searches
+- Try **regex patterns** like `Sword|Axe|Mace` for multiple item types
 
 ## 🗡️ Zeb Weapon Requirements
 

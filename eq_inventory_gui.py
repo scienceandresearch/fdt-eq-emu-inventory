@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext, simpledialog
 import threading
 from typing import Optional, List, Dict
+from signet_of_might_data import SignetOfMightQuest
 
 
 class EQInventoryGUI:
@@ -117,6 +118,9 @@ class EQInventoryGUI:
         
         # Results Tab
         self.create_results_tab()
+        
+        # Signet of Might Quest Tab
+        self.create_signet_quest_tab()
         
         # Set initial directory to current directory and auto-load
         initial_dir = os.getcwd()
@@ -1619,6 +1623,868 @@ Bank: {bank_items:,}"""
     
 
     
+    def create_signet_quest_tab(self):
+        """Create the Signet of Might quest tracking tab."""
+        quest_frame = ttk.Frame(self.notebook)
+        self.notebook.add(quest_frame, text="🏺 Signet of Might")
+        
+        # Initialize quest data
+        self.signet_quest = SignetOfMightQuest()
+        
+        # Main container
+        main_container = ttk.Frame(quest_frame)
+        main_container.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Title and description
+        title_frame = ttk.Frame(main_container)
+        title_frame.pack(fill='x', pady=(0,10))
+        
+        title_label = ttk.Label(title_frame, text="🏺 Signet of Might Quest Tracker", 
+                               font=('Arial', 16, 'bold'))
+        title_label.pack()
+        
+        desc_label = ttk.Label(title_frame, 
+                              text="Aid Grimel Quest Chain - Track your progress through all 7 tradeskill quests",
+                              font=('Arial', 10))
+        desc_label.pack(pady=(5,0))
+        
+        # Global requirements section
+        req_frame = ttk.LabelFrame(main_container, text="📋 Global Requirements")
+        req_frame.pack(fill='x', pady=(0,10))
+        
+        req_inner = ttk.Frame(req_frame)
+        req_inner.pack(fill='x', padx=10, pady=5)
+        
+        req_text = tk.Text(req_inner, height=4, wrap='word', font=('Arial', 9),
+                          bg='#f8f8f8', relief='flat', state='disabled')
+        req_text.pack(fill='x')
+        
+        req_content = """Global Requirements:
+• Elemental Planar Flags (progression)
+• Tradeskills: 220+ unmodified in Blacksmithing, Brewing, Jewelcrafting, Pottery, Tailoring, Fletching, Baking"""
+        
+        req_text.config(state='normal')
+        req_text.insert(1.0, req_content)
+        req_text.config(state='disabled')
+        
+        # Control buttons
+        control_frame = ttk.Frame(main_container)
+        control_frame.pack(fill='x', pady=(0,10))
+        
+        ttk.Button(control_frame, text="🔍 Analyze Quest Progress", 
+                  command=self.analyze_signet_quest_progress,
+                  style='Accent.TButton').pack(side='left', padx=(0,10))
+        
+        ttk.Button(control_frame, text="📊 Show All Quest Items", 
+                  command=self.show_all_quest_items).pack(side='left', padx=(0,10))
+        
+        ttk.Button(control_frame, text="💾 Export Quest Report", 
+                  command=self.export_quest_report).pack(side='left')
+        
+        # Quest progress display
+        progress_frame = ttk.LabelFrame(main_container, text="📈 Quest Progress")
+        progress_frame.pack(fill='both', expand=True)
+        
+        # Create notebook for quest tabs
+        self.quest_notebook = ttk.Notebook(progress_frame)
+        self.quest_notebook.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Overview tab
+        self.create_quest_overview_tab()
+        
+        # Individual quest tabs
+        for quest_num in range(1, 8):
+            self.create_individual_quest_tab(quest_num)
+        
+        # Items to Farm tab
+        self.create_items_to_farm_tab()
+    
+    def create_quest_overview_tab(self):
+        """Create the quest overview tab."""
+        overview_frame = ttk.Frame(self.quest_notebook)
+        self.quest_notebook.add(overview_frame, text="📊 Overview")
+        
+        # Progress summary
+        summary_frame = ttk.LabelFrame(overview_frame, text="Quest Chain Progress")
+        summary_frame.pack(fill='x', padx=10, pady=10)
+        
+        self.quest_summary_text = tk.Text(summary_frame, height=12, wrap='word', 
+                                         font=('Consolas', 10), state='disabled')
+        self.quest_summary_text.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Initialize with placeholder
+        self.quest_summary_text.config(state='normal')
+        self.quest_summary_text.insert(1.0, "Click 'Analyze Quest Progress' to see your progress through the Signet of Might quest chain.")
+        self.quest_summary_text.config(state='disabled')
+        
+        # Common items across quests
+        common_frame = ttk.LabelFrame(overview_frame, text="Common Items Across Quests")
+        common_frame.pack(fill='both', expand=True, padx=10, pady=(0,10))
+        
+        # Create treeview for common items
+        common_columns = ('Item', 'Total Needed', 'Used In Quests', 'Source')
+        self.common_items_tree = ttk.Treeview(common_frame, columns=common_columns, show='headings', height=8)
+        
+        for col in common_columns:
+            self.common_items_tree.heading(col, text=col)
+            if col == 'Item':
+                self.common_items_tree.column(col, width=200)
+            elif col == 'Used In Quests':
+                self.common_items_tree.column(col, width=150)
+            elif col == 'Source':
+                self.common_items_tree.column(col, width=250)
+            else:
+                self.common_items_tree.column(col, width=100)
+        
+        common_scrollbar = ttk.Scrollbar(common_frame, orient='vertical', command=self.common_items_tree.yview)
+        self.common_items_tree.configure(yscrollcommand=common_scrollbar.set)
+        
+        self.common_items_tree.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        common_scrollbar.pack(side='right', fill='y', pady=10)
+        
+        # Populate common items
+        self.populate_common_items()
+    
+    def create_individual_quest_tab(self, quest_num):
+        """Create a tab for an individual quest."""
+        quest_data = self.signet_quest.quest_chain[quest_num]
+        quest_name = quest_data['name']
+        
+        quest_frame = ttk.Frame(self.quest_notebook)
+        self.quest_notebook.add(quest_frame, text=f"{quest_num}. {quest_name}")
+        
+        # Quest description
+        desc_frame = ttk.LabelFrame(quest_frame, text=f"Quest {quest_num}: {quest_name}")
+        desc_frame.pack(fill='x', padx=10, pady=10)
+        
+        desc_text = tk.Text(desc_frame, height=3, wrap='word', font=('Arial', 9),
+                           bg='#f8f8f8', relief='flat', state='disabled')
+        desc_text.pack(fill='x', padx=10, pady=5)
+        
+        desc_content = quest_data['description']
+        if 'prerequisite' in quest_data:
+            desc_content += f"\nPrerequisite: {quest_data['prerequisite']}"
+        
+        desc_text.config(state='normal')
+        desc_text.insert(1.0, desc_content)
+        desc_text.config(state='disabled')
+        
+        # Key items needed
+        items_frame = ttk.LabelFrame(quest_frame, text="Key Items Needed (💡 Double-click crafted items for recipe details)")
+        items_frame.pack(fill='both', expand=True, padx=10, pady=(0,10))
+        
+        # Create treeview for quest items
+        item_columns = ('Item', 'Qty', 'Owned', 'Status', 'Source', 'Type')
+        quest_tree = ttk.Treeview(items_frame, columns=item_columns, show='headings', height=10)
+        
+        for col in item_columns:
+            quest_tree.heading(col, text=col)
+            if col == 'Item':
+                quest_tree.column(col, width=200)
+            elif col == 'Source':
+                quest_tree.column(col, width=250)
+            elif col in ['Qty', 'Owned']:
+                quest_tree.column(col, width=60)
+            elif col == 'Status':
+                quest_tree.column(col, width=80)
+            else:
+                quest_tree.column(col, width=100)
+        
+        quest_scrollbar = ttk.Scrollbar(items_frame, orient='vertical', command=quest_tree.yview)
+        quest_tree.configure(yscrollcommand=quest_scrollbar.set)
+        
+        quest_tree.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        quest_scrollbar.pack(side='right', fill='y', pady=10)
+        
+        # Store reference to the treeview
+        setattr(self, f'quest_{quest_num}_tree', quest_tree)
+        
+        # Bind double-click event for recipe details
+        quest_tree.bind('<Double-1>', lambda event, qnum=quest_num: self.on_quest_item_double_click(event, qnum))
+        
+        # Populate with quest items (will be updated when analysis is run)
+        key_items = quest_data.get('key_items', {})
+        for item_name, item_info in key_items.items():
+            quest_tree.insert('', 'end', values=(
+                item_name,
+                item_info['quantity'],
+                '?',  # Will be filled during analysis
+                '?',  # Will be filled during analysis
+                item_info['source'],
+                item_info['type'].title()
+            ))
+    
+    def populate_common_items(self):
+        """Populate the common items tree with items used across multiple quests."""
+        all_items = self.signet_quest.get_all_unique_items()
+        
+        # Filter to show only items used in multiple quests or high quantities
+        common_items = {name: data for name, data in all_items.items() 
+                       if len(data['used_in_quests']) > 1 or data['total_quantity'] > 1}
+        
+        for item_name, item_data in common_items.items():
+            quests_str = ', '.join(item_data['used_in_quests'])
+            sources_str = ', '.join(item_data['sources'])
+            
+            self.common_items_tree.insert('', 'end', values=(
+                item_name,
+                item_data['total_quantity'],
+                quests_str,
+                sources_str
+            ))
+    
+    def analyze_signet_quest_progress(self):
+        """Analyze inventory for Signet of Might quest progress."""
+        if self.items_df.empty:
+            messagebox.showwarning("Warning", "No inventory data loaded")
+            return
+        
+        # Get progress for all quests
+        progress = self.signet_quest.get_quest_progress_summary(self.items_df)
+        
+        # Update overview
+        self.update_quest_overview(progress)
+        
+        # Update individual quest tabs
+        for quest_num in range(1, 8):
+            quest_name = self.signet_quest.quest_chain[quest_num]['name']
+            if quest_name in progress:
+                self.update_individual_quest_tab(quest_num, progress[quest_name])
+        
+        messagebox.showinfo("Analysis Complete", "Quest progress analysis completed! Check the Overview tab for summary.")
+    
+    def update_quest_overview(self, progress):
+        """Update the quest overview with progress data."""
+        overview_lines = []
+        overview_lines.append("🏺 SIGNET OF MIGHT QUEST PROGRESS")
+        overview_lines.append("=" * 50)
+        overview_lines.append("")
+        
+        total_quests = len(progress)
+        completed_quests = len([q for q in progress.values() if q['can_complete']])
+        
+        overview_lines.append(f"Overall Progress: {completed_quests}/{total_quests} quests ready")
+        overview_lines.append("")
+        
+        for quest_num in range(1, 8):
+            quest_data = self.signet_quest.quest_chain[quest_num]
+            quest_name = quest_data['name']
+            
+            if quest_name in progress:
+                quest_progress = progress[quest_name]
+                status_icon = "✅" if quest_progress['can_complete'] else "❌"
+                percentage = quest_progress['progress_percentage']
+                satisfied = quest_progress['items_satisfied']
+                total = quest_progress['total_items']
+                
+                overview_lines.append(f"{status_icon} Quest {quest_num}: {quest_name}")
+                overview_lines.append(f"   Progress: {satisfied}/{total} items ({percentage:.1f}%)")
+                
+                if not quest_progress['can_complete'] and quest_progress['missing_items']:
+                    missing_count = len(quest_progress['missing_items'])
+                    overview_lines.append(f"   Missing: {missing_count} items")
+                    
+                    # Show first few missing items
+                    for i, (item_name, item_info) in enumerate(list(quest_progress['missing_items'].items())[:3]):
+                        overview_lines.append(f"     • {item_name} (need {item_info['needed']})")
+                    
+                    if missing_count > 3:
+                        overview_lines.append(f"     ... and {missing_count - 3} more")
+                
+                overview_lines.append("")
+        
+        # Update the text widget
+        self.quest_summary_text.config(state='normal')
+        self.quest_summary_text.delete(1.0, tk.END)
+        self.quest_summary_text.insert(1.0, "\n".join(overview_lines))
+        self.quest_summary_text.config(state='disabled')
+    
+    def update_individual_quest_tab(self, quest_num, quest_progress):
+        """Update an individual quest tab with progress data."""
+        quest_tree = getattr(self, f'quest_{quest_num}_tree')
+        
+        # Clear existing items
+        for item in quest_tree.get_children():
+            quest_tree.delete(item)
+        
+        # Repopulate with updated data
+        quest_data = self.signet_quest.quest_chain[quest_num]
+        key_items = quest_data.get('key_items', {})
+        
+        for item_name, item_info in key_items.items():
+            if item_name in quest_progress['owned_items']:
+                owned_data = quest_progress['owned_items'][item_name]
+                owned_qty = owned_data['owned']
+                required_qty = owned_data['required']
+                status = "✅ Ready" if owned_data['satisfied'] else f"❌ Need {required_qty - owned_qty}"
+            else:
+                owned_qty = 0
+                required_qty = item_info['quantity']
+                status = f"❌ Need {required_qty}"
+            
+            quest_tree.insert('', 'end', values=(
+                item_name,
+                required_qty,
+                owned_qty,
+                status,
+                item_info['source'],
+                item_info['type'].title()
+            ))
+    
+    def show_all_quest_items(self):
+        """Show all quest items in the main search results."""
+        if self.items_df.empty:
+            messagebox.showwarning("Warning", "No inventory data loaded")
+            return
+        
+        # Get all unique items from all quests
+        all_items = self.signet_quest.get_all_unique_items()
+        item_names = list(all_items.keys())
+        
+        # Create a regex pattern to match any quest item
+        search_pattern = "|".join([f"({name.replace('(', '\\(').replace(')', '\\)')})" for name in item_names])
+        
+        # Perform search
+        search_results = self.search_items(search_pattern, character=None, exact_match=False, item_type=None)
+        
+        # Display results
+        self.display_results(search_results, "All Signet of Might Quest Items")
+    
+    def export_quest_report(self):
+        """Export a detailed quest progress report."""
+        if self.items_df.empty:
+            messagebox.showwarning("Warning", "No inventory data loaded")
+            return
+        
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            title="Save Quest Report"
+        )
+        
+        if not filename:
+            return
+        
+        try:
+            # Get progress for all quests
+            progress = self.signet_quest.get_quest_progress_summary(self.items_df)
+            
+            report_lines = []
+            report_lines.append("SIGNET OF MIGHT QUEST PROGRESS REPORT")
+            report_lines.append("=" * 60)
+            report_lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            report_lines.append("")
+            
+            # Overall summary
+            total_quests = len(progress)
+            completed_quests = len([q for q in progress.values() if q['can_complete']])
+            report_lines.append(f"Overall Progress: {completed_quests}/{total_quests} quests ready")
+            report_lines.append("")
+            
+            # Detailed quest breakdown
+            for quest_num in range(1, 8):
+                quest_data = self.signet_quest.quest_chain[quest_num]
+                quest_name = quest_data['name']
+                
+                report_lines.append(f"QUEST {quest_num}: {quest_name.upper()}")
+                report_lines.append("-" * 40)
+                report_lines.append(f"Description: {quest_data['description']}")
+                
+                if 'prerequisite' in quest_data:
+                    report_lines.append(f"Prerequisite: {quest_data['prerequisite']}")
+                
+                if quest_name in progress:
+                    quest_progress = progress[quest_name]
+                    status = "READY" if quest_progress['can_complete'] else "NOT READY"
+                    percentage = quest_progress['progress_percentage']
+                    satisfied = quest_progress['items_satisfied']
+                    total = quest_progress['total_items']
+                    
+                    report_lines.append(f"Status: {status}")
+                    report_lines.append(f"Progress: {satisfied}/{total} items ({percentage:.1f}%)")
+                    report_lines.append("")
+                    
+                    # Items breakdown
+                    report_lines.append("Items Status:")
+                    for item_name, item_data in quest_progress['owned_items'].items():
+                        owned = item_data['owned']
+                        required = item_data['required']
+                        status_icon = "✅" if item_data['satisfied'] else "❌"
+                        report_lines.append(f"  {status_icon} {item_name}: {owned}/{required} ({item_data['source']})")
+                    
+                    if quest_progress['missing_items']:
+                        report_lines.append("")
+                        report_lines.append("Missing Items:")
+                        for item_name, item_data in quest_progress['missing_items'].items():
+                            report_lines.append(f"  • {item_name}: Need {item_data['needed']} ({item_data['source']})")
+                
+                report_lines.append("")
+                report_lines.append("")
+            
+            # Write report to file
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write("\n".join(report_lines))
+            
+            messagebox.showinfo("Export Successful", f"Quest report exported to:\n{filename}")
+            
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to export quest report:\n{e}")
+    
+    def on_quest_item_double_click(self, event, quest_num):
+        """Handle double-click on quest items to show recipe details."""
+        quest_tree = getattr(self, f'quest_{quest_num}_tree')
+        selection = quest_tree.selection()
+        
+        if not selection:
+            return
+        
+        # Get the selected item
+        item = quest_tree.item(selection[0])
+        item_name = item['values'][0]
+        
+        # Get quest data
+        quest_data = self.signet_quest.quest_chain[quest_num]
+        key_items = quest_data.get('key_items', {})
+        
+        if item_name not in key_items:
+            return
+        
+        item_info = key_items[item_name]
+        
+        # Check if this item has a recipe
+        if item_info.get('type') == 'crafted' and 'recipe' in item_info:
+            self.show_recipe_details(item_name, item_info['recipe'])
+        else:
+            # Show basic item information
+            self.show_item_details(item_name, item_info)
+    
+    def show_recipe_details(self, item_name, recipe_data):
+        """Show detailed recipe information in a popup window."""
+        popup = tk.Toplevel(self.root)
+        popup.title(f"Recipe Details: {item_name}")
+        popup.geometry("800x700")
+        popup.configure(bg='#f0f0f0')
+        
+        # Make it modal
+        popup.transient(self.root)
+        popup.grab_set()
+        
+        # Main container
+        main_frame = ttk.Frame(popup)
+        main_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Title
+        title_label = ttk.Label(main_frame, text=f"📜 Recipe: {item_name}", 
+                               font=('Arial', 16, 'bold'))
+        title_label.pack(pady=(0,10))
+        
+        # Recipe info
+        info_frame = ttk.LabelFrame(main_frame, text="Recipe Information")
+        info_frame.pack(fill='x', pady=(0,10))
+        
+        info_inner = ttk.Frame(info_frame)
+        info_inner.pack(fill='x', padx=10, pady=5)
+        
+        # Recipe details
+        recipe_info = []
+        recipe_info.append(f"Skill: {recipe_data.get('skill', 'Unknown')}")
+        recipe_info.append(f"Trivial: {recipe_data.get('trivial', 'Unknown')}")
+        recipe_info.append(f"Container: {recipe_data.get('container', 'Unknown')}")
+        recipe_info.append(f"Yields: {recipe_data.get('yields', 1)}")
+        
+        if 'note' in recipe_data:
+            recipe_info.append(f"Note: {recipe_data['note']}")
+        
+        info_text = tk.Text(info_inner, height=4, wrap='word', font=('Arial', 10),
+                           bg='#f8f8f8', relief='flat', state='disabled')
+        info_text.pack(fill='x')
+        
+        info_text.config(state='normal')
+        info_text.insert(1.0, '\n'.join(recipe_info))
+        info_text.config(state='disabled')
+        
+        # Components
+        components_frame = ttk.LabelFrame(main_frame, text="Required Components")
+        components_frame.pack(fill='both', expand=True, pady=(0,10))
+        
+        # Create notebook for components (in case of nested recipes)
+        components_notebook = ttk.Notebook(components_frame)
+        components_notebook.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Main components tab
+        main_components_frame = ttk.Frame(components_notebook)
+        components_notebook.add(main_components_frame, text="Components")
+        
+        # Create treeview for components
+        comp_columns = ('Component', 'Qty', 'Type', 'Source', 'Notes')
+        comp_tree = ttk.Treeview(main_components_frame, columns=comp_columns, show='headings', height=12)
+        
+        for col in comp_columns:
+            comp_tree.heading(col, text=col)
+            if col == 'Component':
+                comp_tree.column(col, width=200)
+            elif col == 'Source':
+                comp_tree.column(col, width=250)
+            elif col == 'Notes':
+                comp_tree.column(col, width=200)
+            elif col == 'Qty':
+                comp_tree.column(col, width=60)
+            else:
+                comp_tree.column(col, width=100)
+        
+        comp_scrollbar = ttk.Scrollbar(main_components_frame, orient='vertical', command=comp_tree.yview)
+        comp_tree.configure(yscrollcommand=comp_scrollbar.set)
+        
+        comp_tree.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+        comp_scrollbar.pack(side='right', fill='y', pady=5)
+        
+        # Populate components
+        components = recipe_data.get('components', {})
+        sub_recipes = {}
+        
+        for comp_name, comp_info in components.items():
+            comp_type = comp_info.get('type', 'unknown')
+            comp_qty = comp_info.get('quantity', 1)
+            comp_source = comp_info.get('source', 'Unknown')
+            comp_notes = comp_info.get('note', '')
+            
+            # Check if this component has a sub-recipe
+            if comp_type == 'crafted' and 'recipe' in comp_info:
+                comp_notes = f"Crafted - Double-click for recipe"
+                sub_recipes[comp_name] = comp_info['recipe']
+            
+            comp_tree.insert('', 'end', values=(
+                comp_name,
+                comp_qty,
+                comp_type.title(),
+                comp_source,
+                comp_notes
+            ))
+        
+        # Bind double-click for sub-recipes
+        def on_component_double_click(event):
+            selection = comp_tree.selection()
+            if selection:
+                comp_item = comp_tree.item(selection[0])
+                comp_name = comp_item['values'][0]
+                if comp_name in sub_recipes:
+                    self.show_recipe_details(comp_name, sub_recipes[comp_name])
+        
+        comp_tree.bind('<Double-1>', on_component_double_click)
+        
+        # Add sub-recipe tabs if any exist
+        for sub_name, sub_recipe in sub_recipes.items():
+            sub_frame = ttk.Frame(components_notebook)
+            components_notebook.add(sub_frame, text=f"📜 {sub_name}")
+            
+            # Sub-recipe info
+            sub_info_frame = ttk.LabelFrame(sub_frame, text=f"Sub-Recipe: {sub_name}")
+            sub_info_frame.pack(fill='x', padx=5, pady=5)
+            
+            sub_info_inner = ttk.Frame(sub_info_frame)
+            sub_info_inner.pack(fill='x', padx=5, pady=5)
+            
+            sub_recipe_info = []
+            sub_recipe_info.append(f"Skill: {sub_recipe.get('skill', 'Unknown')}")
+            sub_recipe_info.append(f"Trivial: {sub_recipe.get('trivial', 'Unknown')}")
+            sub_recipe_info.append(f"Container: {sub_recipe.get('container', 'Unknown')}")
+            sub_recipe_info.append(f"Yields: {sub_recipe.get('yields', 1)}")
+            
+            if 'note' in sub_recipe:
+                sub_recipe_info.append(f"Note: {sub_recipe['note']}")
+            
+            sub_info_text = tk.Text(sub_info_inner, height=3, wrap='word', font=('Arial', 9),
+                                   bg='#f8f8f8', relief='flat', state='disabled')
+            sub_info_text.pack(fill='x')
+            
+            sub_info_text.config(state='normal')
+            sub_info_text.insert(1.0, '\n'.join(sub_recipe_info))
+            sub_info_text.config(state='disabled')
+            
+            # Sub-components
+            sub_comp_frame = ttk.LabelFrame(sub_frame, text="Components")
+            sub_comp_frame.pack(fill='both', expand=True, padx=5, pady=5)
+            
+            sub_comp_tree = ttk.Treeview(sub_comp_frame, columns=comp_columns, show='headings', height=8)
+            
+            for col in comp_columns:
+                sub_comp_tree.heading(col, text=col)
+                if col == 'Component':
+                    sub_comp_tree.column(col, width=150)
+                elif col == 'Source':
+                    sub_comp_tree.column(col, width=200)
+                elif col == 'Notes':
+                    sub_comp_tree.column(col, width=150)
+                elif col == 'Qty':
+                    sub_comp_tree.column(col, width=50)
+                else:
+                    sub_comp_tree.column(col, width=80)
+            
+            sub_comp_scrollbar = ttk.Scrollbar(sub_comp_frame, orient='vertical', command=sub_comp_tree.yview)
+            sub_comp_tree.configure(yscrollcommand=sub_comp_scrollbar.set)
+            
+            sub_comp_tree.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+            sub_comp_scrollbar.pack(side='right', fill='y', pady=5)
+            
+            # Populate sub-components
+            sub_components = sub_recipe.get('components', {})
+            for sub_comp_name, sub_comp_info in sub_components.items():
+                sub_comp_type = sub_comp_info.get('type', 'unknown')
+                sub_comp_qty = sub_comp_info.get('quantity', 1)
+                sub_comp_source = sub_comp_info.get('source', 'Unknown')
+                sub_comp_notes = sub_comp_info.get('note', '')
+                
+                sub_comp_tree.insert('', 'end', values=(
+                    sub_comp_name,
+                    sub_comp_qty,
+                    sub_comp_type.title(),
+                    sub_comp_source,
+                    sub_comp_notes
+                ))
+        
+        # Instructions
+        instructions_frame = ttk.LabelFrame(main_frame, text="Instructions")
+        instructions_frame.pack(fill='x', pady=(0,10))
+        
+        instructions_text = tk.Text(instructions_frame, height=3, wrap='word', font=('Arial', 9),
+                                   bg='#f8f8f8', relief='flat', state='disabled')
+        instructions_text.pack(fill='x', padx=10, pady=5)
+        
+        instructions_content = f"1. Gather all required components listed above\n"
+        instructions_content += f"2. Use a {recipe_data.get('container', 'crafting container')}\n"
+        instructions_content += f"3. Combine components (trivial: {recipe_data.get('trivial', 'Unknown')})\n"
+        
+        if 'note' in recipe_data:
+            instructions_content += f"4. Note: {recipe_data['note']}"
+        
+        instructions_text.config(state='normal')
+        instructions_text.insert(1.0, instructions_content)
+        instructions_text.config(state='disabled')
+        
+        # Close button
+        close_frame = ttk.Frame(main_frame)
+        close_frame.pack(fill='x', pady=(10,0))
+        
+        ttk.Button(close_frame, text="Close", command=popup.destroy).pack(side='right')
+        
+        # Search for components button
+        ttk.Button(close_frame, text="🔍 Search for Components", 
+                  command=lambda: self.search_recipe_components(item_name, recipe_data)).pack(side='left')
+        
+        # Center the popup
+        popup.update_idletasks()
+        x = (popup.winfo_screenwidth() // 2) - (popup.winfo_width() // 2)
+        y = (popup.winfo_screenheight() // 2) - (popup.winfo_height() // 2)
+        popup.geometry(f"+{x}+{y}")
+    
+    def show_item_details(self, item_name, item_info):
+        """Show basic item information for non-crafted items."""
+        popup = tk.Toplevel(self.root)
+        popup.title(f"Item Details: {item_name}")
+        popup.geometry("500x300")
+        popup.configure(bg='#f0f0f0')
+        
+        # Make it modal
+        popup.transient(self.root)
+        popup.grab_set()
+        
+        # Main container
+        main_frame = ttk.Frame(popup)
+        main_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Title
+        title_label = ttk.Label(main_frame, text=f"📦 Item: {item_name}", 
+                               font=('Arial', 16, 'bold'))
+        title_label.pack(pady=(0,10))
+        
+        # Item info
+        info_frame = ttk.LabelFrame(main_frame, text="Item Information")
+        info_frame.pack(fill='both', expand=True, pady=(0,10))
+        
+        info_text = tk.Text(info_frame, wrap='word', font=('Arial', 10),
+                           bg='#f8f8f8', relief='flat', state='disabled')
+        info_text.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Build item info
+        item_details = []
+        item_details.append(f"Item: {item_name}")
+        item_details.append(f"Type: {item_info.get('type', 'Unknown').title()}")
+        item_details.append(f"Quantity Needed: {item_info.get('quantity', 1)}")
+        item_details.append(f"Source: {item_info.get('source', 'Unknown')}")
+        
+        if 'note' in item_info:
+            item_details.append(f"Note: {item_info['note']}")
+        
+        # Add acquisition tips based on type
+        item_details.append("")
+        item_details.append("Acquisition Tips:")
+        
+        item_type = item_info.get('type', '').lower()
+        if item_type == 'vendor':
+            item_details.append("• Purchase from the specified vendor")
+            item_details.append("• Bring sufficient platinum/gold")
+        elif item_type == 'drop':
+            item_details.append("• Hunt the specified mobs/zones")
+            item_details.append("• May require multiple kills for rare drops")
+        elif item_type == 'quest':
+            item_details.append("• Complete the specified quest")
+            item_details.append("• Check prerequisites and faction requirements")
+        elif item_type == 'foraged':
+            item_details.append("• Use Forage skill in specified zones")
+            item_details.append("• Higher skill increases success rate")
+        elif item_type == 'ground_spawn':
+            item_details.append("• Look for ground spawns in specified areas")
+            item_details.append("• Respawn times may vary")
+        
+        info_text.config(state='normal')
+        info_text.insert(1.0, '\n'.join(item_details))
+        info_text.config(state='disabled')
+        
+        # Close button
+        close_frame = ttk.Frame(main_frame)
+        close_frame.pack(fill='x', pady=(10,0))
+        
+        ttk.Button(close_frame, text="Close", command=popup.destroy).pack(side='right')
+        
+        # Search for item button
+        ttk.Button(close_frame, text="🔍 Search in Inventory", 
+                  command=lambda: self.search_for_item(item_name)).pack(side='left')
+        
+        # Center the popup
+        popup.update_idletasks()
+        x = (popup.winfo_screenwidth() // 2) - (popup.winfo_width() // 2)
+        y = (popup.winfo_screenheight() // 2) - (popup.winfo_height() // 2)
+        popup.geometry(f"+{x}+{y}")
+    
+    def search_recipe_components(self, recipe_name, recipe_data):
+        """Search for all components of a recipe in inventory."""
+        if self.items_df.empty:
+            messagebox.showwarning("Warning", "No inventory data loaded")
+            return
+        
+        components = recipe_data.get('components', {})
+        if not components:
+            messagebox.showinfo("No Components", f"No components found for {recipe_name}")
+            return
+        
+        # Create search pattern for all components
+        component_names = list(components.keys())
+        search_pattern = "|".join([f"({name.replace('(', '\\(').replace(')', '\\)')})" for name in component_names])
+        
+        # Perform search
+        search_results = self.search_items(search_pattern, character=None, exact_match=False, item_type=None)
+        
+        # Display results
+        self.display_results(search_results, f"Components for {recipe_name}")
+    
+    def search_for_item(self, item_name):
+        """Search for a specific item in inventory."""
+        if self.items_df.empty:
+            messagebox.showwarning("Warning", "No inventory data loaded")
+            return
+        
+        # Perform search
+        search_results = self.search_items(item_name, character=None, exact_match=False, item_type=None)
+        
+        # Display results
+        self.display_results(search_results, f"Search: {item_name}")
+    
+    def create_items_to_farm_tab(self):
+        """Create the Items to Farm tab showing all dropped items needed for the quest."""
+        farm_frame = ttk.Frame(self.quest_notebook)
+        self.quest_notebook.add(farm_frame, text="🎯 Items to Farm")
+        
+        # Title and description
+        title_frame = ttk.Frame(farm_frame)
+        title_frame.pack(fill='x', padx=10, pady=10)
+        
+        title_label = ttk.Label(title_frame, text="🎯 Items to Farm", 
+                               font=('Arial', 14, 'bold'))
+        title_label.pack()
+        
+        desc_label = ttk.Label(title_frame, 
+                              text="All dropped items needed for the Signet of Might quest chain",
+                              font=('Arial', 10))
+        desc_label.pack(pady=(5,0))
+        
+        # Create treeview for farming items
+        farm_columns = ('Item', 'Qty', 'Zone/Location', 'Mob/Source', 'Drop Rate', 'Quest', 'Notes')
+        self.farm_tree = ttk.Treeview(farm_frame, columns=farm_columns, show='headings', height=20)
+        
+        for col in farm_columns:
+            self.farm_tree.heading(col, text=col)
+            if col == 'Item':
+                self.farm_tree.column(col, width=200)
+            elif col == 'Zone/Location':
+                self.farm_tree.column(col, width=150)
+            elif col == 'Mob/Source':
+                self.farm_tree.column(col, width=150)
+            elif col == 'Notes':
+                self.farm_tree.column(col, width=200)
+            elif col == 'Qty':
+                self.farm_tree.column(col, width=50)
+            elif col == 'Drop Rate':
+                self.farm_tree.column(col, width=80)
+            else:
+                self.farm_tree.column(col, width=100)
+        
+        farm_scrollbar = ttk.Scrollbar(farm_frame, orient='vertical', command=self.farm_tree.yview)
+        self.farm_tree.configure(yscrollcommand=farm_scrollbar.set)
+        
+        self.farm_tree.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        farm_scrollbar.pack(side='right', fill='y', pady=10)
+        
+        # Populate farming items
+        self.populate_farming_items()
+    
+    def populate_farming_items(self):
+        """Populate the farming items tree with all dropped items from the quest chain."""
+        farming_items = [
+            # Blacksmithing Quest
+            ("Drop of Pure Rain", 1, "Bastion of Thunder", "Vann mobs", "Rare", "Blacksmithing", "Rare drop from thunder elementals"),
+            ("Sandstorm Pearl", 3, "Bastion of Thunder", "Jord mobs", "Uncommon", "Blacksmithing", "Earth elementals in BoT"),
+            ("Storm Rider Blood", 1, "Bastion of Thunder", "Stormrider mobs", "Common", "Blacksmithing", "Flying storm creatures"),
+            ("Raw Diamond", 2, "Various Zones", "Random world drop", "Rare", "Blacksmithing", "Can be found in many zones"),
+            ("Nightmare Mephit Blood", 2, "Plane of Nightmare", "Nightmare mephits", "Common", "Blacksmithing", "Small flying creatures in PoN"),
+            
+            # Jewelcrafting Quest
+            ("Blue Diamond", 1, "Various Zones", "Random world drop", "Rare", "Jewelcrafting", "Rare gem, check vendors too"),
+            ("Branch of Sylvan Oak", 1, "Eastern Wastes/Wakening Lands", "Foraged", "Uncommon", "Jewelcrafting", "Forage skill required"),
+            
+            # Pottery Quest
+            ("Iron Oxide", 1, "Various Zones", "Various mobs", "Uncommon", "Pottery", "Metallic creatures often drop"),
+            ("Permafrost Crystals", 1, "Permafrost/Everfrost", "Ice creatures", "Uncommon", "Pottery", "Cold climate zones"),
+            ("Sacred Water", 1, "Plane of Tranquility", "Various sources", "Uncommon", "Pottery", "Holy/divine creatures"),
+            
+            # Tailoring Quest
+            ("Fire Mephit Blood", 1, "Plane of Fire", "Fire mephits", "Common", "Tailoring", "Small fire elementals"),
+            ("Molten Ore", 1, "Plane of Fire", "Fire elementals", "Uncommon", "Tailoring", "Large fire creatures"),
+            ("Obsidianwood Sap", 1, "Plane of Fire", "Burning trees", "Uncommon", "Tailoring", "Tree-like creatures in PoF"),
+            ("Fire Arachnid Silk", 1, "Plane of Fire", "Fire spiders", "Uncommon", "Tailoring", "Spider creatures in PoF"),
+            
+            # Fletching Quest
+            ("Featherwood Bowstave", 1, "Plane of Air", "Air elementals", "Uncommon", "Fletching", "Flying creatures in PoA"),
+            ("Air Arachnid Silk", 2, "Plane of Air", "Air spiders", "Uncommon", "Fletching", "Spider creatures in PoA"),
+            ("Chunk of Wind Metal", 2, "Plane of Air", "Air elementals", "Common", "Fletching", "For Wind Metal Bow Cam"),
+            ("Clockwork Grease", 2, "Plane of Innovation", "Foraged", "Common", "Fletching", "Forage in mechanical areas"),
+            
+            # Baking Quest
+            ("Hero Parts", 1, "Various Zones", "Heroic NPCs", "Uncommon", "Baking", "Named or heroic creatures"),
+            ("Slarghilug Leg", 1, "Plane of Disease", "Slarghilug", "Uncommon", "Baking", "Large disease creatures"),
+            ("Habanero Pepper", 1, "Various Zones", "Foraged", "Common", "Baking", "Hot climate zones"),
+            ("Planar Fruit", 2, "Elemental Planes", "Foraged", "Uncommon", "Baking", "Any elemental plane"),
+            
+            # Final Quest
+            ("Hope Stone", 1, "Elemental Planes", "Random rare drop", "Very Rare", "Final", "Extremely rare, any elemental plane"),
+            
+            # Ground Spawns
+            ("Strange Dark Fungus", 6, "North Kaladim", "Ground spawn", "Common", "Brewing", "Farm area, 6min respawn"),
+            ("Underfoot Mushroom", 6, "North Kaladim", "Ground spawn", "Common", "Brewing", "Farm area, 6min respawn"),
+        ]
+        
+        for item_data in farming_items:
+            self.farm_tree.insert('', 'end', values=item_data)
+
     def run(self):
         """Start the GUI application."""
         self.root.mainloop()

@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from datetime import datetime
 import re
+from signet_of_might_data import SignetOfMightQuest
 
 # Page config
 st.set_page_config(
@@ -348,6 +349,227 @@ if uploaded_files:
                 - Try the Quick Search buttons above
                 - Use regex patterns like `Sword|Axe|Mace` for multiple types
                 """)
+        
+        # Signet of Might Quest Section
+        st.markdown("---")
+        st.header("🏺 Signet of Might Quest Tracker")
+        st.markdown("*Track your progress through the Aid Grimel quest chain*")
+        
+        # Initialize quest data
+        if 'signet_quest' not in st.session_state:
+            st.session_state.signet_quest = SignetOfMightQuest()
+        
+        # Quest analysis controls
+        quest_col1, quest_col2, quest_col3 = st.columns([2, 1, 1])
+        
+        with quest_col1:
+            st.info("🎯 **Requirements:** Complete all 7 tradeskill quests (Blacksmithing → Brewing → Jewelcrafting → Pottery → Tailoring → Fletching → Baking)")
+        
+        with quest_col2:
+            if st.button("🔍 Analyze Quest Progress", type="primary", key="analyze_quest"):
+                with st.spinner("🔄 Analyzing quest progress..."):
+                    progress = st.session_state.signet_quest.get_quest_progress_summary(items_df)
+                    st.session_state.quest_progress = progress
+                    st.success("Quest analysis complete!")
+                    st.rerun()
+        
+        with quest_col3:
+            if st.button("📊 Show All Quest Items", key="show_quest_items"):
+                # Get all unique items from all quests
+                all_items = st.session_state.signet_quest.get_all_unique_items()
+                item_names = list(all_items.keys())
+                
+                # Create a regex pattern to match any quest item
+                search_pattern = "|".join([f"({name.replace('(', '\\(').replace(')', '\\)')})" for name in item_names])
+                
+                # Perform search
+                df_quest = items_df[items_df['IsEmpty'] == False].copy()
+                df_quest = df_quest[df_quest['Name'].str.contains(search_pattern, case=False, na=False, regex=True)]
+                
+                st.markdown("---")
+                st.success(f"📄 **All Signet of Might Quest Items** ({len(df_quest)} items found)")
+                
+                if not df_quest.empty:
+                    display_df = df_quest[['Character', 'Name', 'Location', 'ItemType', 'Count']].copy()
+                    st.dataframe(display_df, width='stretch', hide_index=True)
+                else:
+                    st.info("No quest items found in your inventory.")
+        
+        # Show quest progress if available
+        if 'quest_progress' in st.session_state:
+            progress = st.session_state.quest_progress
+            
+            st.subheader("📈 Quest Chain Progress")
+            
+            # Overall progress metrics
+            total_quests = len(progress)
+            completed_quests = len([q for q in progress.values() if q['can_complete']])
+            
+            progress_col1, progress_col2, progress_col3 = st.columns(3)
+            with progress_col1:
+                st.metric("Quests Ready", f"{completed_quests}/{total_quests}")
+            with progress_col2:
+                overall_percentage = (completed_quests / total_quests * 100) if total_quests > 0 else 0
+                st.metric("Overall Progress", f"{overall_percentage:.1f}%")
+            with progress_col3:
+                if completed_quests == total_quests:
+                    st.metric("Status", "🎉 READY!")
+                else:
+                    st.metric("Status", "⚠️ In Progress")
+            
+            # Individual quest progress
+            st.subheader("📋 Individual Quest Status")
+            st.info("💡 **Tip:** Crafted items have detailed recipes - check the desktop version for interactive recipe details!")
+            
+            # Create tabs for individual quests plus Items to Farm
+            quest_tab_names = [f"Quest {i}: {st.session_state.signet_quest.quest_chain[i]['name']}" for i in range(1, 8)]
+            quest_tab_names.append("🎯 Items to Farm")
+            quest_tabs = st.tabs(quest_tab_names)
+            
+            # Individual quest tabs
+            for i, tab in enumerate(quest_tabs[:-1], 1):  # Exclude the last tab (Items to Farm)
+                with tab:
+                    quest_data = st.session_state.signet_quest.quest_chain[i]
+                    quest_name = quest_data['name']
+                    
+                    if quest_name in progress:
+                        quest_progress = progress[quest_name]
+                        
+                        # Quest status
+                        if quest_progress['can_complete']:
+                            st.success(f"✅ **{quest_name} - READY TO COMPLETE!**")
+                        else:
+                            st.warning(f"❌ **{quest_name} - Missing Components**")
+                        
+                        # Progress bar
+                        progress_percentage = quest_progress['progress_percentage']
+                        st.progress(progress_percentage / 100)
+                        st.write(f"Progress: {quest_progress['items_satisfied']}/{quest_progress['total_items']} items ({progress_percentage:.1f}%)")
+                        
+                        # Quest description
+                        st.write(f"**Description:** {quest_data['description']}")
+                        if 'prerequisite' in quest_data:
+                            st.write(f"**Prerequisite:** {quest_data['prerequisite']}")
+                        
+                        # Items breakdown
+                        st.subheader("Required Items")
+                        
+                        item_data = []
+                        for item_name, item_info in quest_progress['owned_items'].items():
+                            status = "✅ Ready" if item_info['satisfied'] else f"❌ Need {item_info['required'] - item_info['owned']}"
+                            item_data.append({
+                                'Item': item_name,
+                                'Owned': item_info['owned'],
+                                'Required': item_info['required'],
+                                'Status': status,
+                                'Source': item_info['source'],
+                                'Type': item_info['type'].title()
+                            })
+                        
+                        if item_data:
+                            st.dataframe(
+                                pd.DataFrame(item_data),
+                                width='stretch',
+                                hide_index=True,
+                                column_config={
+                                    "Item": st.column_config.TextColumn("Item", width="large"),
+                                    "Owned": st.column_config.NumberColumn("Owned", width="small"),
+                                    "Required": st.column_config.NumberColumn("Required", width="small"),
+                                    "Status": st.column_config.TextColumn("Status", width="medium"),
+                                    "Source": st.column_config.TextColumn("Source", width="large"),
+                                    "Type": st.column_config.TextColumn("Type", width="small")
+                                }
+                            )
+                        
+                        # Missing items
+                        if quest_progress['missing_items']:
+                            st.subheader("Missing Items")
+                            missing_data = []
+                            for item_name, item_info in quest_progress['missing_items'].items():
+                                missing_data.append({
+                                    'Item': item_name,
+                                    'Needed': item_info['needed'],
+                                    'Source': item_info['source'],
+                                    'Type': item_info['type'].title()
+                                })
+                            
+                            st.dataframe(
+                                pd.DataFrame(missing_data),
+                                width='stretch',
+                                hide_index=True
+                            )
+            
+            # Items to Farm tab
+            with quest_tabs[-1]:
+                st.subheader("🎯 Items to Farm")
+                st.write("All dropped items needed for the Signet of Might quest chain")
+                
+                # Create farming items data
+                farming_items = [
+                    # Blacksmithing Quest
+                    ("Drop of Pure Rain", 1, "Bastion of Thunder", "Vann mobs", "Rare", "Blacksmithing", "Rare drop from thunder elementals"),
+                    ("Sandstorm Pearl", 3, "Bastion of Thunder", "Jord mobs", "Uncommon", "Blacksmithing", "Earth elementals in BoT"),
+                    ("Storm Rider Blood", 1, "Bastion of Thunder", "Stormrider mobs", "Common", "Blacksmithing", "Flying storm creatures"),
+                    ("Raw Diamond", 2, "Various Zones", "Random world drop", "Rare", "Blacksmithing", "Can be found in many zones"),
+                    ("Nightmare Mephit Blood", 2, "Plane of Nightmare", "Nightmare mephits", "Common", "Blacksmithing", "Small flying creatures in PoN"),
+                    
+                    # Jewelcrafting Quest
+                    ("Blue Diamond", 1, "Various Zones", "Random world drop", "Rare", "Jewelcrafting", "Rare gem, check vendors too"),
+                    ("Branch of Sylvan Oak", 1, "Eastern Wastes/Wakening Lands", "Foraged", "Uncommon", "Jewelcrafting", "Forage skill required"),
+                    
+                    # Pottery Quest
+                    ("Iron Oxide", 1, "Various Zones", "Various mobs", "Uncommon", "Pottery", "Metallic creatures often drop"),
+                    ("Permafrost Crystals", 1, "Permafrost/Everfrost", "Ice creatures", "Uncommon", "Pottery", "Cold climate zones"),
+                    ("Sacred Water", 1, "Plane of Tranquility", "Various sources", "Uncommon", "Pottery", "Holy/divine creatures"),
+                    
+                    # Tailoring Quest
+                    ("Fire Mephit Blood", 1, "Plane of Fire", "Fire mephits", "Common", "Tailoring", "Small fire elementals"),
+                    ("Molten Ore", 1, "Plane of Fire", "Fire elementals", "Uncommon", "Tailoring", "Large fire creatures"),
+                    ("Obsidianwood Sap", 1, "Plane of Fire", "Burning trees", "Uncommon", "Tailoring", "Tree-like creatures in PoF"),
+                    ("Fire Arachnid Silk", 1, "Plane of Fire", "Fire spiders", "Uncommon", "Tailoring", "Spider creatures in PoF"),
+                    
+                    # Fletching Quest
+                    ("Featherwood Bowstave", 1, "Plane of Air", "Air elementals", "Uncommon", "Fletching", "Flying creatures in PoA"),
+                    ("Air Arachnid Silk", 2, "Plane of Air", "Air spiders", "Uncommon", "Fletching", "Spider creatures in PoA"),
+                    ("Chunk of Wind Metal", 2, "Plane of Air", "Air elementals", "Common", "Fletching", "For Wind Metal Bow Cam"),
+                    ("Clockwork Grease", 2, "Plane of Innovation", "Foraged", "Common", "Fletching", "Forage in mechanical areas"),
+                    
+                    # Baking Quest
+                    ("Hero Parts", 1, "Various Zones", "Heroic NPCs", "Uncommon", "Baking", "Named or heroic creatures"),
+                    ("Slarghilug Leg", 1, "Plane of Disease", "Slarghilug", "Uncommon", "Baking", "Large disease creatures"),
+                    ("Habanero Pepper", 1, "Various Zones", "Foraged", "Common", "Baking", "Hot climate zones"),
+                    ("Planar Fruit", 2, "Elemental Planes", "Foraged", "Uncommon", "Baking", "Any elemental plane"),
+                    
+                    # Final Quest
+                    ("Hope Stone", 1, "Elemental Planes", "Random rare drop", "Very Rare", "Final", "Extremely rare, any elemental plane"),
+                    
+                    # Ground Spawns
+                    ("Strange Dark Fungus", 6, "North Kaladim", "Ground spawn", "Common", "Brewing", "Farm area, 6min respawn"),
+                    ("Underfoot Mushroom", 6, "North Kaladim", "Ground spawn", "Common", "Brewing", "Farm area, 6min respawn"),
+                ]
+                
+                # Convert to DataFrame
+                farm_df = pd.DataFrame(farming_items, columns=[
+                    'Item', 'Qty', 'Zone/Location', 'Mob/Source', 'Drop Rate', 'Quest', 'Notes'
+                ])
+                
+                # Display the farming table
+                st.dataframe(
+                    farm_df,
+                    width='stretch',
+                    hide_index=True,
+                    column_config={
+                        "Item": st.column_config.TextColumn("Item", width="medium"),
+                        "Qty": st.column_config.NumberColumn("Qty", width="small"),
+                        "Zone/Location": st.column_config.TextColumn("Zone/Location", width="medium"),
+                        "Mob/Source": st.column_config.TextColumn("Mob/Source", width="medium"),
+                        "Drop Rate": st.column_config.TextColumn("Drop Rate", width="small"),
+                        "Quest": st.column_config.TextColumn("Quest", width="medium"),
+                        "Notes": st.column_config.TextColumn("Notes", width="large")
+                    }
+                )
+                
+                st.info("💡 **Farming Tips:** Focus on rare drops first (Hope Stone, Drop of Pure Rain). Many items can be obtained from multiple sources - check vendors before farming!")
         
         # Move Zeb Weapon Analysis to center area
         st.markdown("---")
