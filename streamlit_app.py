@@ -6,7 +6,7 @@ import re
 
 # Page config
 st.set_page_config(
-    page_title="THJ Inventory Manager",
+    page_title="FDT EQ Emu Inventory Parser",
     page_icon="🎮",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -39,8 +39,8 @@ st.markdown("""
 # Main header
 st.markdown("""
 <div class="main-header">
-    <h1>🎮 The Heroes Journey Inventory Manager</h1>
-    <p><em>Advanced inventory search and Zeb weapon component analyzer</em></p>
+    <h1>🎮 FDT EQ Emu Inventory Parser</h1>
+    <p><em>Find DnK's Tulwar - Advanced inventory search for EverQuest Emulator servers</em></p>
     <p><strong>Web Version - Always Up to Date!</strong></p>
 </div>
 """, unsafe_allow_html=True)
@@ -99,8 +99,8 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("**🔗 Links:**")
-    st.markdown("[📥 Download Desktop Version](https://github.com/scienceandresearch/thj-inventory-manager)")
-    st.markdown("[🐛 Report Issues](https://github.com/scienceandresearch/thj-inventory-manager/issues)")
+    st.markdown("[📥 Download Desktop Version](https://github.com/scienceandresearch/fdt-eq-emu-inventory)")
+    st.markdown("[🐛 Report Issues](https://github.com/scienceandresearch/fdt-eq-emu-inventory/issues)")
 
 # Main app logic
 if uploaded_files:
@@ -448,9 +448,9 @@ else:
     
     with col2:
         st.markdown("""  
-        ### 🚀 Welcome to THJ Inventory Manager!
+        ### 🚀 Welcome to FDT EQ Emu Inventory Parser!
         
-        This web application helps you manage and search your **The Heroes Journey** EverQuest character inventories.
+        This web application helps you manage and search your **EverQuest Emulator** character inventories.
         
         **🎯 Key Features:**
         - **Advanced Search** - Find items across all characters
@@ -460,13 +460,13 @@ else:
         
         **📁 To Get Started:**
         1. Use the sidebar to upload your `*-Inventory.txt` files
-        2. Files should be in tab-separated format from THJ
+        2. Files should be in tab-separated format from EQ Emu
         3. Upload multiple character files at once
         
         **💡 This is the web version** - no installation required!
         
         For the full desktop application with additional features, 
-        visit our [GitHub repository](https://github.com/scienceandresearch/thj-inventory-manager).
+        visit our [GitHub repository](https://github.com/scienceandresearch/fdt-eq-emu-inventory).
         """)
         
         # Sample file format
@@ -482,8 +482,8 @@ Bank1\tTime Phased Quintessence\t11111\t1\t0
 st.markdown("---")
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.markdown("**🎮 THJ Inventory Manager**")
+    st.markdown("**🎮 FDT EQ Emu Inventory Parser**")
 with col2:
-    st.markdown("[📥 Desktop Version](https://github.com/scienceandresearch/thj-inventory-manager)")
+    st.markdown("[📥 Desktop Version](https://github.com/scienceandresearch/fdt-eq-emu-inventory)")
 with col3:
-    st.markdown("[🐛 Report Issues](https://github.com/scienceandresearch/thj-inventory-manager/issues)")
+    st.markdown("[🐛 Report Issues](https://github.com/scienceandresearch/fdt-eq-emu-inventory/issues)")

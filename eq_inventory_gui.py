@@ -13,7 +13,7 @@ from typing import Optional, List, Dict
 class EQInventoryGUI:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("The Heroes Journey Inventory Manager")
+        self.root.title("FDT EQ Emu Inventory Parser")
         self.root.geometry("1400x850")
         self.root.minsize(1200, 650)  # Set minimum window size
         self.root.configure(bg='#2c3e50')
@@ -71,11 +71,11 @@ class EQInventoryGUI:
         title_frame = ttk.Frame(self.root, style='Custom.TFrame')
         title_frame.pack(fill='x', padx=10, pady=8)
         
-        title_label = ttk.Label(title_frame, text="🎮 The Heroes Journey Inventory Manager", style='Title.TLabel')
+        title_label = ttk.Label(title_frame, text="🎮 FDT EQ Emu Inventory Parser", style='Title.TLabel')
         title_label.pack(pady=8)
         
         # Subtitle
-        subtitle_label = ttk.Label(title_frame, text="Advanced inventory search and Zeb weapon component analyzer", 
+        subtitle_label = ttk.Label(title_frame, text="Find DnK's Tulwar - Advanced inventory search for EverQuest Emulator servers", 
                                   font=('Arial', 10), background='#34495e', foreground='#95a5a6')
         subtitle_label.pack()
         
@@ -337,7 +337,7 @@ class EQInventoryGUI:
                            bg='#f0f0f0', relief='flat', state='disabled')
         info_text.pack(fill='x', pady=(0,5))
         
-        info_content = """Zeb Weapon requires 12 different Fragment of Truth types (Legendary) plus Time Phased Quintessence and Vortex of the Past. You can combine 4 Enchanted fragments to make 1 Legendary. "Include equipped" counts fragments in worn gear AND spare gear."""
+        info_content = """Zeb Weapon requires 12 different Fragment of Truth types (Legendary) plus Time Phased Quintessence and Vortex of the Past. You can combine 4 Enchanted fragments to make 1 Legendary. "Include equipped" counts fragments in worn gear AND spare gear. (Common on EQ Emu servers)"""
         
         info_text.config(state='normal')
         info_text.insert(1.0, info_content)

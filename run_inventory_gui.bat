@@ -1,6 +1,7 @@
 @echo off
 echo ================================================================
-echo    The Heroes Journey Inventory Manager
+echo    FDT EQ Emu Inventory Parser
+echo    "Find DnK's Tulwar" - Advanced EQ Emulator Inventory Tool
 echo ================================================================
 echo.
 echo Checking Python installation...
@@ -27,7 +28,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo Starting The Heroes Journey Inventory Manager...
+echo Starting FDT EQ Emu Inventory Parser...
 echo.
 python eq_inventory_gui.py
 

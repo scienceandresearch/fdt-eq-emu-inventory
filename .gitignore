@@ -51,6 +51,14 @@ desktop.ini
 *-Inventory.txt
 !SAMPLE_INVENTORY/*-Inventory.txt
 
+# Additional protection for any real character data
+*-inventory.txt
+*_Inventory.txt
+*inventory.txt
+real_data/
+personal_inventories/
+my_characters/
+
 # Logs
 *.log
 

@@ -1,6 +1,7 @@
 @echo off
 echo ================================================================
-echo    THJ Inventory Manager - Web Version (Local Testing)
+echo    FDT EQ Emu Inventory Parser - Web Version (Local Testing)
+echo    "Find DnK's Tulwar" - Advanced EQ Emulator Inventory Tool
 echo ================================================================
 echo.
 echo Installing/updating dependencies...
